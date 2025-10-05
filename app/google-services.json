@@ -12,7 +12,20 @@
           "package_name": "com.secretspaces32.android"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "170496527031-epr66eaf1hp90blcjufu3g9s43a1og5n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.secretspaces32.android",
+            "certificate_hash": "f97c9d3f9f998f4eb7482b0352be988d5992d9ee"
+          }
+        },
+        {
+          "client_id": "170496527031-ul59lq2gqm76re4an5p2lftol7g3hjfl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA9WjUZpMYEi3KlDdV4Xoow1aZzCPgZLmM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "170496527031-ul59lq2gqm76re4an5p2lftol7g3hjfl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
