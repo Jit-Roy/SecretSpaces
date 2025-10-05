@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "your-project-id",
-    "storage_bucket": "your-project-id.appspot.com"
+    "project_number": "170496527031",
+    "project_id": "secretspaces",
+    "storage_bucket": "secretspaces.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "YOUR_APP_ID",
+        "mobilesdk_app_id": "1:170496527031:android:67f8d0f2ad0de5ca495b32",
         "android_client_info": {
-          "package_name": "com.example.myapplication"
+          "package_name": "com.secretspaces32.android"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyA9WjUZpMYEi3KlDdV4Xoow1aZzCPgZLmM"
         }
       ],
       "services": {
@@ -27,4 +27,3 @@
   ],
   "configuration_version": "1"
 }
-

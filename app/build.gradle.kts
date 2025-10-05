@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.secretspaces32.android"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.secretspaces32.android"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -53,6 +53,12 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx:22.3.0")
     implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
     implementation("com.google.firebase:firebase-storage-ktx:20.3.0")
+
+    // Google Sign-In with Credential Manager (modern approach)
+    implementation("androidx.credentials:credentials:1.2.2")
+    implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 
     // Material Icons for Compose
     implementation("androidx.compose.material:material-icons-extended:1.6.2")
