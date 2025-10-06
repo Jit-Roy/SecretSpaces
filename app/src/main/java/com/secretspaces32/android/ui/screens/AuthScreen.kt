@@ -4,6 +4,8 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.secretspaces32.android.R
 
 @Composable
 fun AuthScreen(
@@ -29,6 +32,7 @@ fun AuthScreen(
     isLoading: Boolean = false
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
     var isSignUpMode by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -61,6 +65,7 @@ fun AuthScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -169,7 +174,7 @@ fun AuthScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Divider with "OR" text
         Row(
@@ -180,25 +185,20 @@ fun AuthScreen(
             Text(
                 text = "OR",
                 modifier = Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             HorizontalDivider(modifier = Modifier.weight(1f))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Google Sign-In Button
-        OutlinedButton(
+        // Google Sign-In Button - Made more prominent
+        Button(
             onClick = {
                 try {
                     // Get web client ID from resources
-                    val webClientId = context.resources.getString(
-                        context.resources.getIdentifier(
-                            "default_web_client_id",
-                            "string",
-                            context.packageName
-                        )
-                    )
+                    val webClientId = context.getString(R.string.default_web_client_id)
 
                     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestIdToken(webClientId)
@@ -216,13 +216,20 @@ fun AuthScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("Continue with Google")
+                Text(
+                    text = "🔐 Continue with Google",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
 
@@ -240,5 +247,7 @@ fun AuthScreen(
                 else "Don't have an account? Sign Up"
             )
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
