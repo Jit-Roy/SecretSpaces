@@ -199,7 +199,10 @@ fun SecretSpacesApp() {
                                 viewModel.selectSecret(secret)
                                 selectedScreen = Screen.SecretDetail
                             },
-                            selectedSecret = uiState.selectedSecret
+                            selectedSecret = uiState.selectedSecret,
+                            onLocationPermissionGranted = {
+                                viewModel.updateLocation()
+                            }
                         )
                     }
                     Screen.Feed -> {

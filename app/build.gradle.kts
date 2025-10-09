@@ -17,6 +17,21 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Read MapTiler API key from local.properties
+        val properties = org.jetbrains.kotlin.konan.properties.Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { properties.load(it) }
+        }
+        val maptilerApiKey = properties.getProperty("MAPTILER_API_KEY") ?: ""
+        buildConfigField("String", "MAPTILER_API_KEY", "\"$maptilerApiKey\"")
+
+        // Add native library options for 16 KB page size support
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -37,10 +52,16 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = false
+            // Keep debugSymbols for better crash reporting
+            keepDebugSymbols += "**/*.so"
         }
     }
 }
@@ -80,8 +101,8 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
-    // OSMDroid for maps
-    implementation(libs.osmdroid.android)
+    // MapLibre for maps
+    implementation(libs.maplibre.maps)
     implementation(libs.play.services.location)
 
     // Coroutines for Play Services (needed for .await())

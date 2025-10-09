@@ -98,13 +98,12 @@ class FirebaseSecretRepository {
         return try {
             val snapshot = secretsCollection
                 .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
             val secrets = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(Secret::class.java)
-            }
+            }.sortedByDescending { it.timestamp } // Sort in memory instead
 
             Result.success(secrets)
         } catch (e: Exception) {

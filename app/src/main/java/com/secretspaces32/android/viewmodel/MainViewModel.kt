@@ -222,16 +222,40 @@ class MainViewModel(
     fun updateLocation() {
         viewModelScope.launch {
             try {
+                println("DEBUG: Starting location update...")
+
+                if (!locationHelper.hasLocationPermission()) {
+                    println("DEBUG: Location permission not granted")
+                    // Don't show error, just use default location
+                    // The MapScreen will show a message after timeout
+                    return@launch
+                }
+
+                if (!locationHelper.isLocationEnabled()) {
+                    println("DEBUG: Location services not enabled")
+                    // Don't show error, just use default location
+                    return@launch
+                }
+
+                println("DEBUG: Fetching location...")
                 val location = locationHelper.getCurrentLocation()
+
+                if (location == null) {
+                    println("DEBUG: Location is null - using default view")
+                    // Don't set error, just let map show default location
+                    return@launch
+                }
+
+                println("DEBUG: ✅ Location obtained - Lat: ${location.latitude}, Lng: ${location.longitude}")
                 _uiState.value = _uiState.value.copy(currentLocation = location)
 
-                location?.let {
-                    fetchNearbySecrets(it.latitude, it.longitude)
-                }
+                // Fetch nearby secrets with the obtained location
+                fetchNearbySecrets(location.latitude, location.longitude)
+
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "Failed to get location: ${e.message}"
-                )
+                println("DEBUG: ❌ Location error - ${e.message}")
+                e.printStackTrace()
+                // Don't show error toast, just log it
             }
         }
     }
