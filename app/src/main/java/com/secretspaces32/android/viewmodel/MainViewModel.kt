@@ -29,6 +29,8 @@ data class AppUiState(
     val selectedSecretComments: List<Comment> = emptyList(),
     val selectedSecretLikes: List<Like> = emptyList(),
     val isLoading: Boolean = false,
+    val isEmailAuthLoading: Boolean = false,
+    val isGoogleAuthLoading: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -81,7 +83,7 @@ class MainViewModel(
 
     fun signUp(email: String, password: String, username: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isEmailAuthLoading = true)
 
             val authResult = authRepository.signUp(email, password, username)
             authResult.onSuccess { firebaseUser ->
@@ -95,17 +97,17 @@ class MainViewModel(
                     _uiState.value = _uiState.value.copy(
                         isAuthenticated = true,
                         currentUser = user,
-                        isLoading = false
+                        isEmailAuthLoading = false
                     )
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
+                        isEmailAuthLoading = false,
                         errorMessage = "Failed to create user profile: ${e.message}"
                     )
                 }
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isEmailAuthLoading = false,
                     errorMessage = "Sign up failed: ${e.message}"
                 )
             }
@@ -114,14 +116,14 @@ class MainViewModel(
 
     fun signIn(email: String, password: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isEmailAuthLoading = true)
 
             val result = authRepository.signIn(email, password)
             result.onSuccess {
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                _uiState.value = _uiState.value.copy(isEmailAuthLoading = false)
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isEmailAuthLoading = false,
                     errorMessage = "Sign in failed: ${e.message}"
                 )
             }
@@ -130,7 +132,7 @@ class MainViewModel(
 
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isGoogleAuthLoading = true)
 
             val authResult = authRepository.signInWithGoogle(idToken)
             authResult.onSuccess { firebaseUser ->
@@ -142,7 +144,7 @@ class MainViewModel(
                     _uiState.value = _uiState.value.copy(
                         isAuthenticated = true,
                         currentUser = user,
-                        isLoading = false
+                        isGoogleAuthLoading = false
                     )
                 }.onFailure {
                     // Create new user profile
@@ -156,18 +158,18 @@ class MainViewModel(
                         _uiState.value = _uiState.value.copy(
                             isAuthenticated = true,
                             currentUser = user,
-                            isLoading = false
+                            isGoogleAuthLoading = false
                         )
                     }.onFailure { e ->
                         _uiState.value = _uiState.value.copy(
-                            isLoading = false,
+                            isGoogleAuthLoading = false,
                             errorMessage = "Failed to create user profile: ${e.message}"
                         )
                     }
                 }
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
-                    isLoading = false,
+                    isGoogleAuthLoading = false,
                     errorMessage = "Google sign in failed: ${e.message}"
                 )
             }
