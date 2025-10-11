@@ -1,33 +1,30 @@
 package com.secretspaces32.android.utils
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.coroutines.resume
+import kotlin.math.*
 
 class LocationHelper(private val context: Context) {
 
-    private val fusedLocationClient: FusedLocationProviderClient =
-        LocationServices.getFusedLocationProviderClient(context)
+    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
     fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun isLocationEnabled(): Boolean {
@@ -36,90 +33,22 @@ class LocationHelper(private val context: Context) {
                 locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
 
-    suspend fun getCurrentLocation(): Location? {
-        if (!hasLocationPermission()) {
-            return null
+    @SuppressLint("MissingPermission")
+    suspend fun getCurrentLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        val cancellationTokenSource = CancellationTokenSource()
+
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            cancellationTokenSource.token
+        ).addOnSuccessListener { location ->
+            continuation.resume(location)
+        }.addOnFailureListener {
+            continuation.resume(null)
         }
 
-        if (!isLocationEnabled()) {
-            return null
+        continuation.invokeOnCancellation {
+            cancellationTokenSource.cancel()
         }
-
-        return try {
-            // Add timeout of 10 seconds to prevent hanging
-            withTimeout(10000L) {
-                try {
-                    // First try to get fresh location
-                    val cancellationToken = CancellationTokenSource()
-                    var location = fusedLocationClient.getCurrentLocation(
-                        Priority.PRIORITY_HIGH_ACCURACY,
-                        cancellationToken.token
-                    ).await()
-
-                    // If getCurrentLocation returns null, try lastLocation immediately
-                    if (location == null) {
-                        location = fusedLocationClient.lastLocation.await()
-                    }
-
-                    // Return location even if it's not perfectly accurate
-                    // Filter out only obviously wrong locations
-                    if (location != null && isReasonableLocation(location)) {
-                        location
-                    } else {
-                        null
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    // Try last known location as fallback
-                    try {
-                        fusedLocationClient.lastLocation.await()
-                    } catch (e2: Exception) {
-                        null
-                    }
-                }
-            }
-        } catch (e: TimeoutCancellationException) {
-            // Timeout - try to get last location
-            try {
-                fusedLocationClient.lastLocation.await()
-            } catch (e2: Exception) {
-                null
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-    private fun isLocationTooOld(location: Location): Boolean {
-        val maxAge = 5 * 60 * 1000 // 5 minutes
-        return System.currentTimeMillis() - location.time > maxAge
-    }
-
-    private fun isReasonableLocation(location: Location): Boolean {
-        // Basic sanity checks for location
-        return location.latitude >= -90 && location.latitude <= 90 &&
-                location.longitude >= -180 && location.longitude <= 180 &&
-                location.accuracy <= 5000f // Allow up to 5km accuracy
-    }
-
-    private fun isValidLocation(location: Location): Boolean {
-        // Check if location is not the default Google HQ coordinates
-        val googleHQLat = 37.422
-        val googleHQLng = -122.084
-
-        val distanceFromGoogleHQ = calculateDistance(
-            location.latitude, location.longitude,
-            googleHQLat, googleHQLng
-        )
-
-        // If within 1km of Google HQ and accuracy is poor, it's likely a default location
-        if (distanceFromGoogleHQ < 1000 && location.accuracy > 100) {
-            return false
-        }
-
-        // Check for reasonable accuracy (less than 500 meters)
-        return location.accuracy <= 500f
     }
 
     companion object {
@@ -129,32 +58,34 @@ class LocationHelper(private val context: Context) {
             lat2: Double,
             lon2: Double
         ): Double {
-            val results = FloatArray(1)
-            Location.distanceBetween(lat1, lon1, lat2, lon2, results)
-            return results[0].toDouble()
+            val earthRadius = 6371000.0 // meters
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = sin(dLat / 2) * sin(dLat / 2) +
+                    cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                    sin(dLon / 2) * sin(dLon / 2)
+            val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+            return earthRadius * c
         }
 
-        fun formatDistance(distanceInMeters: Double): String {
+        fun formatDistance(meters: Double): String {
             return when {
-                distanceInMeters < 1000 -> "${distanceInMeters.toInt()}m"
-                else -> "${"%.1f".format(distanceInMeters / 1000)}km"
+                meters < 1000 -> "${meters.toInt()}m away"
+                meters < 10000 -> String.format(Locale.US, "%.1f km away", meters / 1000)
+                else -> "${(meters / 1000).toInt()} km away"
             }
         }
 
         fun formatTimestamp(timestamp: Long): String {
             val now = System.currentTimeMillis()
             val diff = now - timestamp
-            val seconds = diff / 1000
-            val minutes = seconds / 60
-            val hours = minutes / 60
-            val days = hours / 24
 
             return when {
-                seconds < 60 -> "just now"
-                minutes < 60 -> "${minutes}m ago"
-                hours < 24 -> "${hours}h ago"
-                days < 7 -> "${days}d ago"
-                else -> "${days / 7}w ago"
+                diff < 60000 -> "Just now"
+                diff < 3600000 -> "${diff / 60000}m ago"
+                diff < 86400000 -> "${diff / 3600000}h ago"
+                diff < 604800000 -> "${diff / 86400000}d ago"
+                else -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(timestamp))
             }
         }
     }

@@ -2,15 +2,8 @@ package com.secretspaces32.android.ui.navigation
 
 import android.Manifest
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.secretspaces32.android.viewmodel.MainViewModel
 import com.secretspaces32.android.ui.screens.*
@@ -27,7 +20,7 @@ enum class Screen {
     SecretDetail
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun SecretSpacesApp() {
     val context = LocalContext.current
@@ -51,25 +44,50 @@ fun SecretSpacesApp() {
         )
     )
 
-    // Request location permissions when authenticated
+    // Initialize location immediately when authenticated
     LaunchedEffect(uiState.isAuthenticated) {
-        if (uiState.isAuthenticated && !locationPermissions.allPermissionsGranted) {
-            locationPermissions.launchMultiplePermissionRequest()
+        if (uiState.isAuthenticated) {
+            try {
+                println("DEBUG: App authenticated, calling updateLocation")
+                // Call updateLocation immediately - it will use default location if no permission
+                viewModel.updateLocation()
+
+                // Then request permissions for better accuracy
+                if (!locationPermissions.allPermissionsGranted) {
+                    println("DEBUG: Launching permission request")
+                    kotlinx.coroutines.delay(500) // Small delay to let UI settle
+                    locationPermissions.launchMultiplePermissionRequest()
+                }
+            } catch (e: Exception) {
+                println("DEBUG: Error in authentication flow: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
     // Update location when permissions are granted
     LaunchedEffect(locationPermissions.allPermissionsGranted) {
         if (locationPermissions.allPermissionsGranted && uiState.isAuthenticated) {
-            viewModel.updateLocation()
+            try {
+                println("DEBUG: Permissions granted, updating to real location")
+                kotlinx.coroutines.delay(300) // Small delay after permission grant
+                viewModel.updateLocation()
+            } catch (e: Exception) {
+                println("DEBUG: Error updating location: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
     // Show error messages
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
+            try {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                viewModel.clearError()
+            } catch (e: Exception) {
+                println("DEBUG: Error showing toast: ${e.message}")
+            }
         }
     }
 
@@ -90,174 +108,101 @@ fun SecretSpacesApp() {
         return
     }
 
-    // Show secret detail screen
-    if (selectedScreen == Screen.SecretDetail && uiState.selectedSecret != null) {
-        SecretDetailScreen(
-            secret = uiState.selectedSecret!!,
-            comments = uiState.selectedSecretComments,
-            likes = uiState.selectedSecretLikes,
-            isLikedByCurrentUser = uiState.selectedSecret!!.isLikedByCurrentUser,
-            onLikeClick = {
-                viewModel.toggleLike(uiState.selectedSecret!!)
-            },
-            onCommentSubmit = { text ->
-                viewModel.addComment(uiState.selectedSecret!!.id, text)
-            },
-            onBack = {
-                viewModel.selectSecret(null)
-                selectedScreen = Screen.Feed
-            },
-            isLoading = uiState.isLoading
-        )
-        return
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(when (selectedScreen) {
-                        Screen.Map -> "Secret Spaces"
-                        Screen.Feed -> "Feed"
-                        Screen.DropSecret -> "Drop Secret"
-                        Screen.Profile -> "Profile"
-                        Screen.MySecrets -> "My Secrets"
-                        else -> "Secret Spaces"
-                    })
+    // Main app navigation
+    when (selectedScreen) {
+        Screen.Map -> {
+            MapScreen(
+                currentLocation = uiState.currentLocation,
+                nearbySecrets = uiState.secrets,
+                isLoading = uiState.isLoading,
+                onSecretClick = { secret ->
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.SecretDetail
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                onDropSecretClick = {
+                    selectedScreen = Screen.DropSecret
+                },
+                onProfileClick = {
+                    selectedScreen = Screen.Profile
+                },
+                onFeedClick = {
+                    selectedScreen = Screen.Feed
+                }
             )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Place, contentDescription = "Map") },
-                    label = { Text("Map") },
-                    selected = selectedScreen == Screen.Map,
-                    onClick = { selectedScreen = Screen.Map }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Menu, contentDescription = "Feed") },
-                    label = { Text("Feed") },
-                    selected = selectedScreen == Screen.Feed,
-                    onClick = { selectedScreen = Screen.Feed }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Add, contentDescription = "Drop Secret") },
-                    label = { Text("Drop") },
-                    selected = selectedScreen == Screen.DropSecret,
-                    onClick = { selectedScreen = Screen.DropSecret }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "My Secrets") },
-                    label = { Text("Mine") },
-                    selected = selectedScreen == Screen.MySecrets,
-                    onClick = {
-                        selectedScreen = Screen.MySecrets
-                        viewModel.loadMySecrets()
-                    }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                    selected = selectedScreen == Screen.Profile,
-                    onClick = { selectedScreen = Screen.Profile }
+        }
+
+        Screen.Feed -> {
+            FeedScreen(
+                secrets = uiState.secrets,
+                isLoading = uiState.isLoading,
+                onSecretClick = { secret ->
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.SecretDetail
+                },
+                onBackClick = {
+                    selectedScreen = Screen.Map
+                }
+            )
+        }
+
+        Screen.DropSecret -> {
+            DropSecretScreen(
+                isLoading = uiState.isLoading,
+                onPostSecret = { text, imageUri, isAnonymous ->
+                    viewModel.createSecret(text, imageUri, isAnonymous)
+                    selectedScreen = Screen.Map
+                }
+            )
+        }
+
+        Screen.Profile -> {
+            ProfileScreen(
+                user = uiState.currentUser,
+                onSignOut = {
+                    viewModel.signOut()
+                    selectedScreen = Screen.Map
+                },
+                onUpdateProfile = { username, bio, imageUri ->
+                    viewModel.updateProfile(username, bio, imageUri)
+                },
+                isLoading = uiState.isLoading
+            )
+        }
+
+        Screen.MySecrets -> {
+            MySecretsScreen(
+                secrets = uiState.mySecrets,
+                isLoading = uiState.isLoading,
+                onSecretClick = { secret ->
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.SecretDetail
+                }
+            )
+        }
+
+        Screen.SecretDetail -> {
+            uiState.selectedSecret?.let { secret ->
+                SecretDetailScreen(
+                    secret = secret,
+                    comments = uiState.selectedSecretComments,
+                    likes = uiState.selectedSecretLikes,
+                    isLikedByCurrentUser = secret.isLikedByCurrentUser,
+                    onLikeClick = {
+                        viewModel.toggleLike(secret)
+                    },
+                    onCommentSubmit = { commentText ->
+                        viewModel.addComment(secret.id, commentText)
+                    },
+                    onBack = {
+                        selectedScreen = Screen.Map
+                    },
+                    isLoading = uiState.isLoading
                 )
             }
         }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            if (!locationPermissions.allPermissionsGranted) {
-                // Show permission request screen
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Location permission is required",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { locationPermissions.launchMultiplePermissionRequest() }) {
-                        Text("Grant Permission")
-                    }
-                }
-            } else {
-                when (selectedScreen) {
-                    Screen.Map -> {
-                        MapScreen(
-                            secrets = uiState.secrets,
-                            currentLatitude = uiState.currentLocation?.latitude,
-                            currentLongitude = uiState.currentLocation?.longitude,
-                            onSecretClick = { secret ->
-                                viewModel.selectSecret(secret)
-                                selectedScreen = Screen.SecretDetail
-                            },
-                            selectedSecret = uiState.selectedSecret,
-                            onLocationPermissionGranted = {
-                                viewModel.updateLocation()
-                            }
-                        )
-                    }
-                    Screen.Feed -> {
-                        FeedScreen(
-                            secrets = uiState.secrets,
-                            isLoading = uiState.isLoading,
-                            onSecretClick = { secret ->
-                                viewModel.selectSecret(secret)
-                                selectedScreen = Screen.SecretDetail
-                            },
-                            onLikeClick = { secret ->
-                                viewModel.toggleLike(secret)
-                            }
-                        )
-                    }
-                    Screen.DropSecret -> {
-                        DropSecretScreen(
-                            isLoading = uiState.isLoading,
-                            onPostSecret = { text, imageUri, isAnonymous ->
-                                viewModel.createSecret(text, imageUri, isAnonymous)
-                                Toast.makeText(
-                                    context,
-                                    "Secret posted successfully!",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                selectedScreen = Screen.Map
-                            }
-                        )
-                    }
-                    Screen.MySecrets -> {
-                        MySecretsScreen(
-                            secrets = uiState.mySecrets,
-                            isLoading = uiState.isLoading,
-                            onSecretClick = { secret ->
-                                viewModel.selectSecret(secret)
-                                selectedScreen = Screen.SecretDetail
-                            }
-                        )
-                    }
-                    Screen.Profile -> {
-                        ProfileScreen(
-                            user = uiState.currentUser,
-                            onSignOut = {
-                                viewModel.signOut()
-                                selectedScreen = Screen.Map
-                            },
-                            onUpdateProfile = { username, bio, imageUri ->
-                                viewModel.updateProfile(username, bio, imageUri)
-                            },
-                            isLoading = uiState.isLoading
-                        )
-                    }
-                    else -> {}
-                }
-            }
+
+        Screen.Auth -> {
+            // Should not reach here as we handle auth above
         }
     }
 }

@@ -101,8 +101,9 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
-    // MapLibre for maps
-    implementation(libs.maplibre.maps)
+    // MapLibre for maps (using MapTiler)
+    implementation("org.maplibre.gl:android-sdk:11.5.2")
+    implementation("org.maplibre.gl:android-plugin-annotation-v9:3.0.2")
     implementation(libs.play.services.location)
 
     // Coroutines for Play Services (needed for .await())

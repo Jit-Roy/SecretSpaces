@@ -225,15 +225,26 @@ class MainViewModel(
                 println("DEBUG: Starting location update...")
 
                 if (!locationHelper.hasLocationPermission()) {
-                    println("DEBUG: Location permission not granted")
-                    // Don't show error, just use default location
-                    // The MapScreen will show a message after timeout
+                    println("DEBUG: Location permission not granted - using default location")
+                    // Use a default location (e.g., San Francisco)
+                    val defaultLocation = Location("default").apply {
+                        latitude = 37.7749
+                        longitude = -122.4194
+                    }
+                    _uiState.value = _uiState.value.copy(currentLocation = defaultLocation)
+                    fetchNearbySecrets(defaultLocation.latitude, defaultLocation.longitude)
                     return@launch
                 }
 
                 if (!locationHelper.isLocationEnabled()) {
-                    println("DEBUG: Location services not enabled")
-                    // Don't show error, just use default location
+                    println("DEBUG: Location services not enabled - using default location")
+                    // Use a default location
+                    val defaultLocation = Location("default").apply {
+                        latitude = 37.7749
+                        longitude = -122.4194
+                    }
+                    _uiState.value = _uiState.value.copy(currentLocation = defaultLocation)
+                    fetchNearbySecrets(defaultLocation.latitude, defaultLocation.longitude)
                     return@launch
                 }
 
@@ -241,8 +252,14 @@ class MainViewModel(
                 val location = locationHelper.getCurrentLocation()
 
                 if (location == null) {
-                    println("DEBUG: Location is null - using default view")
-                    // Don't set error, just let map show default location
+                    println("DEBUG: Location is null - using default location")
+                    // Use a default location
+                    val defaultLocation = Location("default").apply {
+                        latitude = 37.7749
+                        longitude = -122.4194
+                    }
+                    _uiState.value = _uiState.value.copy(currentLocation = defaultLocation)
+                    fetchNearbySecrets(defaultLocation.latitude, defaultLocation.longitude)
                     return@launch
                 }
 
@@ -253,9 +270,15 @@ class MainViewModel(
                 fetchNearbySecrets(location.latitude, location.longitude)
 
             } catch (e: Exception) {
-                println("DEBUG: ❌ Location error - ${e.message}")
+                println("DEBUG: ❌ Location error - ${e.message}, using default location")
                 e.printStackTrace()
-                // Don't show error toast, just log it
+                // Use default location on error
+                val defaultLocation = Location("default").apply {
+                    latitude = 37.7749
+                    longitude = -122.4194
+                }
+                _uiState.value = _uiState.value.copy(currentLocation = defaultLocation)
+                fetchNearbySecrets(defaultLocation.latitude, defaultLocation.longitude)
             }
         }
     }

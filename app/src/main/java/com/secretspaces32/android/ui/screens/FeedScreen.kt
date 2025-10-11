@@ -1,28 +1,23 @@
 package com.secretspaces32.android.ui.screens
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Comment
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.secretspaces32.android.data.model.Secret
@@ -30,101 +25,193 @@ import com.secretspaces32.android.ui.components.*
 import com.secretspaces32.android.ui.theme.*
 import com.secretspaces32.android.utils.LocationHelper
 
+enum class FeedFilter {
+    RECENT, POPULAR, NEARBY
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
     secrets: List<Secret>,
     isLoading: Boolean,
-    onSecretClick: (Secret) -> Unit = {},
-    onLikeClick: (Secret) -> Unit = {}
+    onSecretClick: (Secret) -> Unit,
+    onBackClick: () -> Unit
 ) {
+    var selectedFilter by remember { mutableStateOf(FeedFilter.RECENT) }
+
+    val filteredSecrets = remember(secrets, selectedFilter) {
+        when (selectedFilter) {
+            FeedFilter.RECENT -> secrets.sortedByDescending { it.timestamp }
+            FeedFilter.POPULAR -> secrets.sortedByDescending { it.likeCount + it.commentCount }
+            FeedFilter.NEARBY -> secrets.sortedBy { it.distance ?: Double.MAX_VALUE }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Animated gradient background
-        AnimatedGradientBackground(
-            modifier = Modifier
-                .fillMaxSize()
-                .animateContentSize()
-        )
+        AnimatedGradientBackground(modifier = Modifier.fillMaxSize())
 
-        if (isLoading && secrets.isEmpty()) {
-            // Premium loading state
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top Bar
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = DarkSurface.copy(alpha = 0.95f),
+                tonalElevation = 8.dp
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = DeepPurple,
-                        strokeWidth = 4.dp
-                    )
-                    Text(
-                        text = "Loading secrets nearby...",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+
+                        Text(
+                            text = "Feed",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        // Placeholder for symmetry
+                        Spacer(modifier = Modifier.width(48.dp))
+                    }
+
+                    // Filter Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedFilter == FeedFilter.RECENT,
+                            onClick = { selectedFilter = FeedFilter.RECENT },
+                            label = { Text("🕒 Recent") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = TealPrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = DarkBackground,
+                                labelColor = Color.White.copy(alpha = 0.7f)
+                            )
+                        )
+
+                        FilterChip(
+                            selected = selectedFilter == FeedFilter.POPULAR,
+                            onClick = { selectedFilter = FeedFilter.POPULAR },
+                            label = { Text("🔥 Popular") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = CoralPink,
+                                selectedLabelColor = Color.White,
+                                containerColor = DarkBackground,
+                                labelColor = Color.White.copy(alpha = 0.7f)
+                            )
+                        )
+
+                        FilterChip(
+                            selected = selectedFilter == FeedFilter.NEARBY,
+                            onClick = { selectedFilter = FeedFilter.NEARBY },
+                            label = { Text("📍 Nearby") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = SoftBlue,
+                                selectedLabelColor = Color.White,
+                                containerColor = DarkBackground,
+                                labelColor = Color.White.copy(alpha = 0.7f)
+                            )
+                        )
+                    }
                 }
             }
-        } else if (secrets.isEmpty()) {
-            // Empty state with style
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                GlassmorphicCard {
+
+            // Secrets Feed
+            if (isLoading && secrets.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "🤫",
-                            style = MaterialTheme.typography.displayLarge
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = TealPrimary,
+                            strokeWidth = 4.dp
                         )
                         Text(
-                            text = "No secrets nearby",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Be the first to drop one!",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Loading secrets...",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
                         )
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(
-                    items = secrets.sortedBy { it.distance },
-                    key = { it.id }
-                ) { secret ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(),
-                        exit = fadeOut() + slideOutVertically()
-                    ) {
-                        PremiumSecretCard(
-                            secret = secret,
-                            onClick = { onSecretClick(secret) },
-                            onLikeClick = { onLikeClick(secret) }
-                        )
+            } else if (filteredSecrets.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GlassmorphicCard {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "🤫",
+                                style = MaterialTheme.typography.displayLarge
+                            )
+                            Text(
+                                text = "No secrets found",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Check back later or drop your own!",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(
+                        items = filteredSecrets,
+                        key = { it.id }
+                    ) { secret ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(),
+                            exit = fadeOut() + slideOutVertically()
+                        ) {
+                            FeedSecretCard(
+                                secret = secret,
+                                onClick = { onSecretClick(secret) }
+                            )
+                        }
+                    }
 
-                // Bottom padding
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Bottom padding
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
         }
@@ -133,34 +220,20 @@ fun FeedScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PremiumSecretCard(
-    secret: Secret,
-    onClick: () -> Unit = {},
-    onLikeClick: () -> Unit = {}
-) {
-    var isLiked by remember { mutableStateOf(secret.isLikedByCurrentUser) }
-    val scale by animateFloatAsState(
-        targetValue = if (isLiked) 1.2f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "likeScale"
-    )
-
+fun FeedSecretCard(secret: Secret, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 16.dp,
+                elevation = 12.dp,
                 shape = RoundedCornerShape(24.dp),
-                ambientColor = DeepPurple.copy(alpha = 0.3f),
-                spotColor = ElectricBlue.copy(alpha = 0.3f)
+                ambientColor = TealPrimary.copy(alpha = 0.2f),
+                spotColor = AquaGreen.copy(alpha = 0.2f)
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+            containerColor = DarkSurface.copy(alpha = 0.95f)
         ),
         onClick = onClick
     ) {
@@ -172,206 +245,181 @@ fun PremiumSecretCard(
                     .height(4.dp)
                     .background(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(DeepPurple, ElectricBlue, CoralPink)
+                            colors = listOf(TealPrimary, AquaGreen, SoftTeal)
                         )
                     )
             )
 
-            SecretCardContent(
-                secret = secret,
-                onLikeClick = {
-                    isLiked = !isLiked
-                    onLikeClick()
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun SecretCardContent(
-    secret: Secret,
-    onLikeClick: () -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp)
-    ) {
-        // User header with premium styling
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        ambientColor = DeepPurple.copy(alpha = 0.5f)
-                    )
-            ) {
-                AsyncImage(
-                    model = secret.userProfilePicture ?: "https://ui-avatars.com/api/?name=${secret.username}&background=6C63FF&color=fff&size=128",
-                    contentDescription = "Profile picture",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = secret.username,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (secret.isAnonymous) {
-                        PremiumBadge(
-                            text = "🕶️ Anon",
-                            color = CoralPink
-                        )
-                    }
-                }
-
-                secret.distance?.let { distance ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = ElectricBlue
-                        )
-                        Text(
-                            text = LocationHelper.formatDistance(distance),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ElectricBlue
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = LocationHelper.formatTimestamp(secret.timestamp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Secret text with premium styling
-        Text(
-            text = secret.text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        // Image if available with rounded corners and shadow
-        secret.imageUrl?.let { imageUrl ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(16.dp)
-                    ),
-                shape = RoundedCornerShape(16.dp)
+                    .padding(20.dp)
             ) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "Secret image",
+                // Header with user info and timestamp
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        GradientDivider()
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Engagement buttons with premium animations
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Like button
-            Surface(
-                modifier = Modifier.clickable { onLikeClick() },
-                color = if (secret.isLikedByCurrentUser)
-                    CoralPink.copy(alpha = 0.15f)
-                else
-                    Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (secret.isLikedByCurrentUser)
-                            Icons.Default.Favorite
-                        else
-                            Icons.Default.FavoriteBorder,
-                        contentDescription = "Like",
-                        tint = if (secret.isLikedByCurrentUser)
-                            CoralPink
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "${secret.likeCount}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (secret.isLikedByCurrentUser)
-                            CoralPink
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (secret.isAnonymous) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Anonymous",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        } else {
+                            Text(
+                                text = secret.username,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        secret.distance?.let { distance ->
+                            Text(
+                                text = LocationHelper.formatDistance(distance),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AquaGreen
+                            )
+                        }
+
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+
+                        Text(
+                            text = LocationHelper.formatTimestamp(secret.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
                 }
-            }
 
-            // Comment button
-            Surface(
-                color = Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Secret text
+                Text(
+                    text = secret.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White
+                )
+
+                // Image if available
+                secret.imageUrl?.let { imageUrl ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(16.dp)
+                            ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = "Secret image",
+                            modifier = Modifier.fillMaxWidth(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                GradientDivider()
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Engagement stats
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Comment,
-                        contentDescription = "Comments",
-                        tint = ElectricBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "${secret.commentCount}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Surface(
+                        color = CoralPink.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Likes",
+                                tint = CoralPink,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "${secret.likeCount}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = CoralPink
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = SoftBlue.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChatBubble,
+                                contentDescription = "Comments",
+                                tint = SoftBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "${secret.commentCount}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SoftBlue
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = TealPrimary.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = "Views",
+                                tint = TealPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+

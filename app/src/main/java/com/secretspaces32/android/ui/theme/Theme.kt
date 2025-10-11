@@ -17,15 +17,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = DeepPurple,
+    primary = TealPrimary,
     onPrimary = Color.White,
     primaryContainer = DarkElevated,
-    onPrimaryContainer = VividPurple,
+    onPrimaryContainer = TealLight,
 
-    secondary = ElectricBlue,
+    secondary = SoftBlue,
     onSecondary = Color.White,
     secondaryContainer = DarkCard,
-    onSecondaryContainer = SkyBlue,
+    onSecondaryContainer = AquaGreen,
 
     tertiary = CoralPink,
     onTertiary = Color.White,
@@ -51,18 +51,18 @@ private val DarkColorScheme = darkColorScheme(
 
     inverseSurface = Platinum,
     inverseOnSurface = DarkBackground,
-    inversePrimary = DeepPurple,
+    inversePrimary = TealPrimary,
 
-    surfaceTint = DeepPurple
+    surfaceTint = TealPrimary
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = DeepPurple,
+    primary = TealPrimary,
     onPrimary = Color.White,
-    primaryContainer = LightPurple,
-    onPrimaryContainer = Color(0xFF1A0066),
+    primaryContainer = LightTeal,
+    onPrimaryContainer = TealDark,
 
-    secondary = ElectricBlue,
+    secondary = SoftBlue,
     onSecondary = Color.White,
     secondaryContainer = LightBlue,
     onSecondaryContainer = Color(0xFF001D36),
@@ -91,9 +91,9 @@ private val LightColorScheme = lightColorScheme(
 
     inverseSurface = DeepGray,
     inverseOnSurface = Platinum,
-    inversePrimary = VividPurple,
+    inversePrimary = TealLight,
 
-    surfaceTint = DeepPurple
+    surfaceTint = TealPrimary
 )
 
 @Composable

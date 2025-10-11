@@ -7,8 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,122 +16,268 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.secretspaces32.android.data.model.Secret
 import com.secretspaces32.android.ui.components.*
 import com.secretspaces32.android.ui.theme.*
 import com.secretspaces32.android.utils.LocationHelper
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MySecretsScreen(
     secrets: List<Secret>,
     isLoading: Boolean,
-    onSecretClick: (Secret) -> Unit = {}
+    onSecretClick: (Secret) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Animated gradient background
         AnimatedGradientBackground(modifier = Modifier.fillMaxSize())
 
-        if (isLoading && secrets.isEmpty()) {
-            // Premium loading state
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top Bar
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = DarkSurface.copy(alpha = 0.95f),
+                tonalElevation = 8.dp
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = DeepPurple,
-                        strokeWidth = 4.dp
-                    )
                     Text(
-                        text = "Loading your secrets...",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Mine",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+
+                    // Stats badge
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = TealPrimary.copy(alpha = 0.2f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🤫",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${secrets.size} secrets",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = TealPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
-        } else if (secrets.isEmpty()) {
-            // Empty state with style
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                GlassmorphicCard {
+
+            // Secrets List
+            if (isLoading && secrets.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "📝",
-                            style = MaterialTheme.typography.displayLarge
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = TealPrimary,
+                            strokeWidth = 4.dp
                         )
                         Text(
-                            text = "No secrets yet",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Drop your first secret from the Drop tab!",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Loading your secrets...",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
                         )
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(
-                    items = secrets,
-                    key = { it.id }
-                ) { secret ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(),
-                        exit = fadeOut() + slideOutVertically()
-                    ) {
-                        MySecretCard(secret = secret, onClick = { onSecretClick(secret) })
+            } else if (secrets.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GlassmorphicCard {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "📭",
+                                style = MaterialTheme.typography.displayLarge
+                            )
+                            Text(
+                                text = "No secrets yet",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Start dropping secrets on the map!",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Summary card
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(
+                                    elevation = 12.dp,
+                                    shape = RoundedCornerShape(24.dp),
+                                    ambientColor = TealPrimary.copy(alpha = 0.3f)
+                                ),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = DarkSurface.copy(alpha = 0.95f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp)
+                            ) {
+                                Text(
+                                    text = "Your Secret Stats",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
 
-                // Bottom padding
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    StatItem(
+                                        icon = "❤️",
+                                        value = secrets.sumOf { it.likeCount },
+                                        label = "Total Likes",
+                                        color = CoralPink
+                                    )
+
+                                    StatItem(
+                                        icon = "💬",
+                                        value = secrets.sumOf { it.commentCount },
+                                        label = "Comments",
+                                        color = SoftBlue
+                                    )
+
+                                    StatItem(
+                                        icon = "🗓️",
+                                        value = secrets.size,
+                                        label = "Secrets",
+                                        color = TealPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Secrets list
+                    items(
+                        items = secrets.sortedByDescending { it.timestamp },
+                        key = { it.id }
+                    ) { secret ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(),
+                            exit = fadeOut() + slideOutVertically()
+                        ) {
+                            MySecretCard(
+                                secret = secret,
+                                onClick = { onSecretClick(secret) }
+                            )
+                        }
+                    }
+
+                    // Bottom padding
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+private fun StatItem(
+    icon: String,
+    value: Int,
+    label: String,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = color.copy(alpha = 0.15f)
+        ) {
+            Text(
+                text = icon,
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.headlineMedium
+            )
+        }
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.titleLarge,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.7f)
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
+private fun MySecretCard(
+    secret: Secret,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 16.dp,
+                elevation = 12.dp,
                 shape = RoundedCornerShape(24.dp),
-                ambientColor = DeepPurple.copy(alpha = 0.3f),
-                spotColor = ElectricBlue.copy(alpha = 0.3f)
+                ambientColor = TealPrimary.copy(alpha = 0.2f),
+                spotColor = AquaGreen.copy(alpha = 0.2f)
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+            containerColor = DarkSurface.copy(alpha = 0.95f)
         ),
         onClick = onClick
     ) {
@@ -143,7 +289,7 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                     .height(4.dp)
                     .background(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(MintGreen, ElectricBlue, DeepPurple)
+                            colors = listOf(DeepPurple, CoralPink, TealPrimary)
                         )
                     )
             )
@@ -153,24 +299,34 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // Header with timestamp and status badge
+                // Timestamp and status
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (secret.isAnonymous) {
+                            PremiumBadge(
+                                text = "🕶️ Anonymous",
+                                color = LavenderMist
+                            )
+                        } else {
+                            PremiumBadge(
+                                text = "👤 Public",
+                                color = TealPrimary
+                            )
+                        }
+                    }
+
                     Text(
                         text = LocationHelper.formatTimestamp(secret.timestamp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
                     )
-
-                    if (secret.isAnonymous) {
-                        PremiumBadge(
-                            text = "🕶️ Anonymous",
-                            color = CoralPink
-                        )
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -179,30 +335,9 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                 Text(
                     text = secret.text,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color.White,
+                    maxLines = 3
                 )
-
-                // Image if available
-                secret.imageUrl?.let { imageUrl ->
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp)
-                            .shadow(
-                                elevation = 8.dp,
-                                shape = RoundedCornerShape(16.dp)
-                            ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = "Secret image",
-                            modifier = Modifier.fillMaxWidth(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -210,10 +345,10 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Engagement stats with premium styling
+                // Engagement stats
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Surface(
                         color = CoralPink.copy(alpha = 0.15f),
@@ -228,7 +363,7 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                                 imageVector = Icons.Default.Favorite,
                                 contentDescription = "Likes",
                                 tint = CoralPink,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = "${secret.likeCount}",
@@ -239,7 +374,7 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                     }
 
                     Surface(
-                        color = ElectricBlue.copy(alpha = 0.15f),
+                        color = SoftBlue.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -250,18 +385,28 @@ fun MySecretCard(secret: Secret, onClick: () -> Unit = {}) {
                             Icon(
                                 imageVector = Icons.Default.ChatBubble,
                                 contentDescription = "Comments",
-                                tint = ElectricBlue,
-                                modifier = Modifier.size(20.dp)
+                                tint = SoftBlue,
+                                modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = "${secret.commentCount}",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = ElectricBlue
+                                color = SoftBlue
                             )
                         }
                     }
+
+                    // View details arrow
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "View details",
+                        tint = TealPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
     }
 }
+
