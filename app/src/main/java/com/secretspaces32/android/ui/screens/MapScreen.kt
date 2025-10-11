@@ -16,10 +16,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,8 +54,13 @@ fun MapScreen(
     onFeedClick: () -> Unit
 ) {
     var showSecretPreview by remember { mutableStateOf<Secret?>(null) }
-    var bottomSheetOffset by remember { mutableFloatStateOf(0f) }
-    val maxDragDistance = 300f
+    var bottomSheetOffsetY by remember { mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    // Calculate min and max drag distances
+    val maxSheetHeight = with(density) { 400.dp.toPx() }
+    val minSheetHeight = with(density) { 60.dp.toPx() }
+    val maxDragDistance = maxSheetHeight - minSheetHeight
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Map background
@@ -63,12 +71,27 @@ fun MapScreen(
                 onMarkerClick = { showSecretPreview = it }
             )
         } else {
+            // Show map placeholder while loading location
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(DarkBackground),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
+                // Map placeholder image
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = com.secretspaces32.android.R.drawable.map_placeholder),
+                    contentDescription = "Map Placeholder",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                // Dark overlay for better text visibility
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f))
+                )
+
+                // Loading indicator
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -80,11 +103,12 @@ fun MapScreen(
                     Text(
                         text = "Loading map...",
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = "Fetching your location",
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -115,37 +139,45 @@ fun MapScreen(
             }
         }
 
-        // Bottom sheet (Nearby secrets)
+        // Bottom sheet (Nearby secrets) - fully draggable to any position
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .offset(y = bottomSheetOffset.dp)
+                .offset { androidx.compose.ui.unit.IntOffset(0, bottomSheetOffsetY.toInt()) }
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragEnd = {
-                            if (bottomSheetOffset < -maxDragDistance) onFeedClick()
-                            bottomSheetOffset = 0f
+                            // No snapping - just keep it where the user dragged it
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            val newOffset = bottomSheetOffset + dragAmount.y
-                            bottomSheetOffset = newOffset.coerceIn(-maxDragDistance, 0f)
+                            val newOffset = (bottomSheetOffsetY + dragAmount.y).coerceIn(0f, maxDragDistance)
+                            bottomSheetOffsetY = newOffset
                         }
                     )
                 }
                 .background(
-                    color = DarkSurface.copy(alpha = 0.98f),
+                    color = Color.Black,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 )
                 .padding(top = 8.dp)
         ) {
+            // Drag handle
             Box(
                 modifier = Modifier
                     .width(40.dp)
                     .height(4.dp)
                     .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
                     .align(Alignment.CenterHorizontally)
+                    .clickable {
+                        // Toggle between fully expanded and minimized on tap
+                        bottomSheetOffsetY = if (bottomSheetOffsetY < maxDragDistance / 2) {
+                            maxDragDistance
+                        } else {
+                            0f
+                        }
+                    }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -179,90 +211,97 @@ fun MapScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Content with alpha based on drag position (fades as you drag down)
+            val contentAlpha = (1f - (bottomSheetOffsetY / maxDragDistance)).coerceIn(0f, 1f)
 
-            when {
-                isLoading -> {
-                    LazyColumn(
-                        modifier = Modifier.height(240.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(2) { ShimmerLoadingCard() }
-                    }
-                }
+            Column(
+                modifier = Modifier.alpha(contentAlpha)
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
 
-                nearbySecrets.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                when {
+                    isLoading -> {
+                        LazyColumn(
+                            modifier = Modifier.height(240.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("🔍", style = MaterialTheme.typography.displayMedium)
-                            Text(
-                                text = "No secrets nearby",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Be the first to drop one!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
+                            items(2) { ShimmerLoadingCard() }
                         }
                     }
-                }
 
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.height(240.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(nearbySecrets.take(3), key = { it.id }) { secret ->
-                            CompactSecretCard(secret = secret) { onSecretClick(secret) }
+                    nearbySecrets.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text("🔍", style = MaterialTheme.typography.displayMedium)
+                                Text(
+                                    text = "No secrets nearby",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Be the first to drop one!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
                         }
+                    }
 
-                        if (nearbySecrets.size > 3) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onFeedClick() }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.height(240.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(nearbySecrets.take(3), key = { it.id }) { secret ->
+                                CompactSecretCard(secret = secret) { onSecretClick(secret) }
+                            }
+
+                            if (nearbySecrets.size > 3) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onFeedClick() }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = "See ${nearbySecrets.size - 3} more secrets",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = TealPrimary,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowUp,
-                                            contentDescription = null,
-                                            tint = TealPrimary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "See ${nearbySecrets.size - 3} more secrets",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = TealPrimary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowUp,
+                                                contentDescription = null,
+                                                tint = TealPrimary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Box(
                 modifier = Modifier
