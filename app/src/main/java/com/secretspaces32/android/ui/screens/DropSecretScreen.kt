@@ -1,36 +1,29 @@
 package com.secretspaces32.android.ui.screens
 
-import android.location.Location
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.secretspaces32.android.ui.components.*
-import com.secretspaces32.android.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,10 +41,11 @@ fun DropSecretScreen(
         selectedImageUri = uri
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Animated gradient background
-        AnimatedGradientBackground(modifier = Modifier.fillMaxSize())
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0C0C0C))
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -60,15 +54,15 @@ fun DropSecretScreen(
             // Top Bar
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = DarkSurface.copy(alpha = 0.95f),
-                tonalElevation = 8.dp
+                color = Color(0xFF121212),
+                shadowElevation = 4.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -90,11 +84,13 @@ fun DropSecretScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 // Location indicator
-                Card(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = DarkSurface.copy(alpha = 0.8f)
+                    color = Color(0xFF121212),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
                     )
                 ) {
                     Row(
@@ -106,19 +102,21 @@ fun DropSecretScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = TealPrimary.copy(alpha = 0.2f)
+                            color = Color(0xFFFF4D4D).copy(alpha = 0.2f)
                         ) {
-                            Text(
-                                text = "📍",
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.titleLarge
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = Color(0xFFFF4D4D),
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
                         Column {
                             Text(
                                 text = "Current Location",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = TealPrimary
+                                color = Color(0xFFFF4D4D),
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "Your secret will be dropped here",
@@ -130,11 +128,13 @@ fun DropSecretScreen(
                 }
 
                 // Secret text input
-                Card(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = DarkSurface.copy(alpha = 0.8f)
+                    color = Color(0xFF121212),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
                     )
                 ) {
                     Column(
@@ -144,7 +144,7 @@ fun DropSecretScreen(
                             text = "Your Secret",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -164,21 +164,34 @@ fun DropSecretScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedBorderColor = TealPrimary,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                                cursorColor = TealPrimary
+                                focusedBorderColor = Color(0xFFFF4D4D),
+                                unfocusedBorderColor = Color(0xFFFF4D4D).copy(alpha = 0.3f),
+                                cursorColor = Color(0xFFFF4D4D),
+                                focusedContainerColor = Color(0xFF1C1C1C),
+                                unfocusedContainerColor = Color(0xFF1C1C1C)
                             ),
+                            shape = RoundedCornerShape(12.dp),
                             maxLines = 10
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "${secretText.length}/500 characters",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }
 
                 // Image attachment
-                Card(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = DarkSurface.copy(alpha = 0.8f)
+                    color = Color(0xFF121212),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
                     )
                 ) {
                     Column(
@@ -193,23 +206,24 @@ fun DropSecretScreen(
                                 text = "Add Image (Optional)",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold
                             )
 
                             if (selectedImageUri == null) {
                                 Button(
                                     onClick = { imagePickerLauncher.launch("image/*") },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = SoftBlue.copy(alpha = 0.3f)
-                                    )
+                                        containerColor = Color(0xFFFF4D4D).copy(alpha = 0.2f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Image,
                                         contentDescription = "Add Image",
-                                        tint = SoftBlue
+                                        tint = Color(0xFFFF4D4D)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Choose Image", color = SoftBlue)
+                                    Text("Choose", color = Color(0xFFFF4D4D))
                                 }
                             }
                         }
@@ -226,20 +240,19 @@ fun DropSecretScreen(
                                         .clip(RoundedCornerShape(12.dp)),
                                     contentScale = ContentScale.Crop
                                 )
-                                IconButton(
+                                Surface(
                                     onClick = { selectedImageUri = null },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .background(
-                                            Color.Black.copy(alpha = 0.6f),
-                                            CircleShape
-                                        )
+                                        .padding(8.dp),
+                                    shape = CircleShape,
+                                    color = Color(0xFFFF4D4D)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Remove image",
-                                        tint = Color.White
+                                        tint = Color.White,
+                                        modifier = Modifier.padding(8.dp)
                                     )
                                 }
                             }
@@ -248,11 +261,13 @@ fun DropSecretScreen(
                 }
 
                 // Anonymous toggle
-                Card(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = DarkSurface.copy(alpha = 0.8f)
+                    color = Color(0xFF121212),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
                     )
                 ) {
                     Row(
@@ -267,7 +282,7 @@ fun DropSecretScreen(
                                 text = "🕶️ Post Anonymously",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -282,9 +297,9 @@ fun DropSecretScreen(
                             onCheckedChange = { isAnonymous = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = CoralPink,
+                                checkedTrackColor = Color(0xFFFF4D4D),
                                 uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color.White.copy(alpha = 0.3f)
+                                uncheckedTrackColor = Color(0xFF3C3C3C)
                             )
                         )
                     }
@@ -301,17 +316,11 @@ fun DropSecretScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .shadow(
-                            elevation = 12.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            ambientColor = TealPrimary,
-                            spotColor = AquaGreen
-                        ),
+                        .height(56.dp),
                     enabled = secretText.isNotBlank() && !isLoading,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = TealPrimary,
-                        disabledContainerColor = Color.Gray
+                        containerColor = Color(0xFFFF4D4D),
+                        disabledContainerColor = Color(0xFF3C3C3C)
                     ),
                     shape = RoundedCornerShape(16.dp)
                 ) {

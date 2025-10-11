@@ -267,17 +267,17 @@ fun MapScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 18.dp),
-                contentAlignment = Alignment.CenterEnd
+                    .padding(bottom = 24.dp, end = 20.dp),
+                contentAlignment = Alignment.BottomEnd
             ) {
                 FloatingActionButton(
                     onClick = onDropSecretClick,
                     modifier = Modifier
                         .size(64.dp)
-                        .padding(end = 20.dp)
                         .shadow(14.dp, CircleShape),
                     containerColor = TealPrimary,
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    shape = CircleShape
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
