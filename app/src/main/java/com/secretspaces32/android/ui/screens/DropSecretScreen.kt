@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
@@ -29,7 +30,8 @@ import coil.compose.AsyncImage
 @Composable
 fun DropSecretScreen(
     isLoading: Boolean,
-    onPostSecret: (String, Uri?, Boolean) -> Unit
+    onPostSecret: (String, Uri?, Boolean) -> Unit,
+    onBack: () -> Unit = {}
 ) {
     var secretText by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -62,15 +64,26 @@ fun DropSecretScreen(
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFFFF4D4D)
+                        )
+                    }
+
                     Text(
                         text = "Drop a Secret 🤫",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+
+                    // Placeholder for symmetry
+                    Box(modifier = Modifier.size(48.dp))
                 }
             }
 

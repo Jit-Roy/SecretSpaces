@@ -191,18 +191,28 @@ class FirebaseSecretRepository {
 
     suspend fun getComments(secretId: String): Result<List<Comment>> {
         return try {
+            println("DEBUG: Fetching comments for secret: $secretId")
+
             val snapshot = commentsCollection
                 .whereEqualTo("secretId", secretId)
-                .orderBy("timestamp", Query.Direction.ASCENDING)
                 .get()
                 .await()
 
+            println("DEBUG: Firebase returned ${snapshot.documents.size} comment documents")
+
             val comments = snapshot.documents.mapNotNull { doc ->
+                println("DEBUG: Processing comment doc: ${doc.id}")
                 doc.toObject(Comment::class.java)
             }
 
-            Result.success(comments)
+            // Sort by timestamp in code instead of in query
+            val sortedComments = comments.sortedBy { it.timestamp }
+
+            println("DEBUG: Successfully parsed ${sortedComments.size} comments")
+            Result.success(sortedComments)
         } catch (e: Exception) {
+            println("DEBUG: Error fetching comments: ${e.message}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }

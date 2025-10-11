@@ -399,6 +399,8 @@ class MainViewModel(
         viewModelScope.launch {
             val user = _uiState.value.currentUser ?: return@launch
 
+            println("DEBUG: Adding comment for secret $secretId")
+
             val result = secretRepository.addComment(
                 secretId = secretId,
                 text = text,
@@ -406,16 +408,51 @@ class MainViewModel(
                 userProfilePicture = user.profilePictureUrl
             )
 
-            result.onSuccess {
-                loadSecretDetails(secretId)
+            result.onSuccess { newComment ->
+                println("DEBUG: Comment added successfully: ${newComment.text}")
 
-                // Update comment count in the list
+                // Add small delay to ensure Firebase propagates the comment
+                kotlinx.coroutines.delay(800)
+
+                println("DEBUG: Reloading secret details...")
+                // Reload comments and likes
+                val commentsResult = secretRepository.getComments(secretId)
+                val likesResult = secretRepository.getLikes(secretId)
+
+                commentsResult.onSuccess { comments ->
+                    println("DEBUG: Loaded ${comments.size} comments")
+                    _uiState.value = _uiState.value.copy(selectedSecretComments = comments)
+                }
+
+                likesResult.onSuccess { likes ->
+                    _uiState.value = _uiState.value.copy(selectedSecretLikes = likes)
+                }
+
+                // Update comment count in the secrets list
                 val updatedSecrets = _uiState.value.secrets.map { s ->
                     if (s.id == secretId) {
                         s.copy(commentCount = s.commentCount + 1)
                     } else s
                 }
-                _uiState.value = _uiState.value.copy(secrets = updatedSecrets)
+
+                // Update the selected secret with new comment count
+                val updatedSelectedSecret = _uiState.value.selectedSecret?.let { secret ->
+                    if (secret.id == secretId) {
+                        secret.copy(commentCount = secret.commentCount + 1)
+                    } else secret
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    secrets = updatedSecrets,
+                    selectedSecret = updatedSelectedSecret
+                )
+
+                println("DEBUG: UI state updated with ${_uiState.value.selectedSecretComments.size} comments")
+            }.onFailure { e ->
+                println("DEBUG: Failed to add comment: ${e.message}")
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Failed to add comment: ${e.message}"
+                )
             }
         }
     }

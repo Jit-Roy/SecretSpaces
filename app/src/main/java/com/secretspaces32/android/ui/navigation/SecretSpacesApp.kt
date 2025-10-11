@@ -151,6 +151,9 @@ fun SecretSpacesApp() {
                 onPostSecret = { text, imageUri, isAnonymous ->
                     viewModel.createSecret(text, imageUri, isAnonymous)
                     selectedScreen = Screen.Map
+                },
+                onBack = {
+                    selectedScreen = Screen.Map
                 }
             )
         }
