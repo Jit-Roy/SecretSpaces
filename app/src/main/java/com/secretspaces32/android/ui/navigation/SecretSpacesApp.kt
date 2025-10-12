@@ -3,6 +3,7 @@ package com.secretspaces32.android.ui.navigation
 import android.Manifest
 import android.widget.Toast
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.secretspaces32.android.viewmodel.MainViewModel
@@ -42,6 +43,10 @@ fun SecretSpacesApp() {
 
     val uiState by viewModel.uiState.collectAsState()
     var selectedScreen by remember { mutableStateOf(Screen.Map) }
+
+    // Persist the sheet state at navigation level so it survives screen changes
+    var mapSheetState by rememberSaveable { mutableStateOf("COLLAPSED") }
+
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember { CredentialManager.create(context) }
 
@@ -218,6 +223,10 @@ fun SecretSpacesApp() {
                 },
                 onFeedClick = {
                     selectedScreen = Screen.Feed
+                },
+                initialSheetState = mapSheetState,
+                onSheetStateChange = { newState ->
+                    mapSheetState = newState
                 }
             )
         }

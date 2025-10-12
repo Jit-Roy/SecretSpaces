@@ -8,20 +8,23 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,12 +39,22 @@ import com.secretspaces32.android.data.model.Secret
 import com.secretspaces32.android.ui.components.*
 import com.secretspaces32.android.ui.theme.*
 import com.secretspaces32.android.utils.LocationHelper
+import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
+
+// Define 3 states for the bottom sheet
+enum class SheetState { COLLAPSED, HALF_EXPANDED, FULLY_EXPANDED }
+
+// Custom Saver for SheetState enum
+private val SheetStateSaver = Saver<SheetState, String>(
+    save = { it.name },
+    restore = { SheetState.valueOf(it) }
+)
 
 @Composable
 fun MapScreen(
@@ -51,16 +64,64 @@ fun MapScreen(
     onSecretClick: (Secret) -> Unit,
     onDropSecretClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onFeedClick: () -> Unit
+    @Suppress("UNUSED_PARAMETER") onFeedClick: () -> Unit,
+    initialSheetState: String = "COLLAPSED",
+    onSheetStateChange: (String) -> Unit = {}
 ) {
     var showSecretPreview by remember { mutableStateOf<Secret?>(null) }
-    var bottomSheetOffsetY by remember { mutableFloatStateOf(0f) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
+    var sheetState by remember(initialSheetState) {
+        mutableStateOf(
+            when(initialSheetState) {
+                "FULLY_EXPANDED" -> SheetState.FULLY_EXPANDED
+                "HALF_EXPANDED" -> SheetState.HALF_EXPANDED
+                else -> SheetState.COLLAPSED
+            }
+        )
+    }
 
-    // Calculate min and max drag distances
-    val maxSheetHeight = with(density) { 400.dp.toPx() }
-    val minSheetHeight = with(density) { 60.dp.toPx() }
-    val maxDragDistance = maxSheetHeight - minSheetHeight
+    // Notify parent when sheet state changes
+    LaunchedEffect(sheetState) {
+        onSheetStateChange(sheetState.name)
+    }
+
+    var isRefreshing by remember { mutableStateOf(false) }
+    val lazyListState = rememberLazyListState()
+    var focusedSecret by remember { mutableStateOf<Secret?>(null) }
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
+    val screenHeightPx = windowInfo.containerSize.height.toFloat()
+
+    // Define the three state heights
+    val collapsedHeight = with(density) { 100.dp.toPx() }
+    val halfExpandedHeight = screenHeightPx * 0.5f
+    val fullyExpandedHeight = screenHeightPx - with(density) { 60.dp.toPx() }
+
+    val targetOffset = when (sheetState) {
+        SheetState.FULLY_EXPANDED -> screenHeightPx - fullyExpandedHeight
+        SheetState.HALF_EXPANDED -> screenHeightPx - halfExpandedHeight
+        SheetState.COLLAPSED -> screenHeightPx - collapsedHeight
+    }
+
+    val animatedOffset by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = targetOffset,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+        ),
+        label = "sheetOffset"
+    )
+
+    var dragAmount by remember { mutableFloatStateOf(0f) }
+
+    // Handle pull to refresh
+    val canScrollUp = lazyListState.canScrollBackward
+    LaunchedEffect(canScrollUp, isRefreshing) {
+        if (isRefreshing && !canScrollUp) {
+            delay(1500)
+            isRefreshing = false
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Map background
@@ -68,7 +129,9 @@ fun MapScreen(
             MapViewComposable(
                 currentLocation = currentLocation,
                 secrets = nearbySecrets,
-                onMarkerClick = { showSecretPreview = it }
+                onMarkerClick = { showSecretPreview = it },
+                focusedSecret = focusedSecret,
+                onFocusHandled = { focusedSecret = null }
             )
         } else {
             // Show map placeholder while loading location
@@ -121,8 +184,19 @@ fun MapScreen(
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Title
+            Text(
+                text = "Secret Spaces",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .shadow(8.dp)
+            )
+            
             IconButton(
                 onClick = onProfileClick,
                 modifier = Modifier
@@ -139,191 +213,274 @@ fun MapScreen(
             }
         }
 
-        // Bottom sheet (Nearby secrets) - fully draggable to any position
+        // Bottom sheet (Feed)
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .offset { androidx.compose.ui.unit.IntOffset(0, bottomSheetOffsetY.toInt()) }
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragEnd = {
-                            // No snapping - just keep it where the user dragged it
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val newOffset = (bottomSheetOffsetY + dragAmount.y).coerceIn(0f, maxDragDistance)
-                            bottomSheetOffsetY = newOffset
-                        }
-                    )
-                }
+                .fillMaxSize()
+                .offset { androidx.compose.ui.unit.IntOffset(0, (animatedOffset + dragAmount).toInt()) }
                 .background(
-                    color = Color.Black,
+                    color = DarkBackground,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 )
                 .padding(top = 8.dp)
         ) {
-            // Drag handle
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
-                    .align(Alignment.CenterHorizontally)
-                    .clickable {
-                        // Toggle between fully expanded and minimized on tap
-                        bottomSheetOffsetY = if (bottomSheetOffsetY < maxDragDistance / 2) {
-                            maxDragDistance
-                        } else {
-                            0f
-                        }
-                    }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
+            // Draggable header area (handle + title) wrapped in a single Box
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .pointerInput(sheetState) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                // Determine which state to snap to based on drag amount
+                                sheetState = when {
+                                    // Dragging down
+                                    dragAmount > 0 -> {
+                                        when (sheetState) {
+                                            SheetState.FULLY_EXPANDED -> {
+                                                if (dragAmount > 100) SheetState.HALF_EXPANDED else SheetState.FULLY_EXPANDED
+                                            }
+                                            SheetState.HALF_EXPANDED -> {
+                                                if (dragAmount > 100) SheetState.COLLAPSED else SheetState.HALF_EXPANDED
+                                            }
+                                            SheetState.COLLAPSED -> SheetState.COLLAPSED
+                                        }
+                                    }
+                                    // Dragging up
+                                    dragAmount < 0 -> {
+                                        when (sheetState) {
+                                            SheetState.COLLAPSED -> {
+                                                if (dragAmount < -100) SheetState.HALF_EXPANDED else SheetState.COLLAPSED
+                                            }
+                                            SheetState.HALF_EXPANDED -> {
+                                                if (dragAmount < -100) SheetState.FULLY_EXPANDED else SheetState.HALF_EXPANDED
+                                            }
+                                            SheetState.FULLY_EXPANDED -> SheetState.FULLY_EXPANDED
+                                        }
+                                    }
+                                    else -> sheetState
+                                }
+                                dragAmount = 0f
+                            },
+                            onDrag = { change, dragDelta ->
+                                change.consume()
+                                dragAmount += dragDelta.y
+                                // Limit drag to prevent going beyond bounds
+                                val minOffset = screenHeightPx - fullyExpandedHeight
+                                val maxOffset = screenHeightPx - collapsedHeight
+                                val totalOffset = animatedOffset + dragAmount
+                                // Clamp the total offset
+                                if (totalOffset < minOffset) {
+                                    dragAmount = minOffset - animatedOffset
+                                } else if (totalOffset > maxOffset) {
+                                    dragAmount = maxOffset - animatedOffset
+                                }
+                            }
+                        )
+                    }
             ) {
-                Text(
-                    text = "📍 Nearby Secrets",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                // Drag handle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(4.dp)
+                            .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                            .clickable {
+                                // Cycle through states on tap
+                                sheetState = when (sheetState) {
+                                    SheetState.COLLAPSED -> SheetState.HALF_EXPANDED
+                                    SheetState.HALF_EXPANDED -> SheetState.FULLY_EXPANDED
+                                    SheetState.FULLY_EXPANDED -> SheetState.COLLAPSED
+                                }
+                            }
                     )
-                )
+                }
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = TealPrimary.copy(alpha = 0.25f)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Header with title and count
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${nearbySecrets.size}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = TealPrimary,
-                        fontWeight = FontWeight.Bold
+                        text = "🌟 Secret Feed",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = TealPrimary.copy(alpha = 0.25f)
+                    ) {
+                        Text(
+                            text = "${nearbySecrets.size}",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TealPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
-            // Content with alpha based on drag position (fades as you drag down)
-            val contentAlpha = (1f - (bottomSheetOffsetY / maxDragDistance)).coerceIn(0f, 1f)
-
-            Column(
-                modifier = Modifier.alpha(contentAlpha)
-            ) {
+            // Feed content
+            if (sheetState != SheetState.COLLAPSED) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                when {
-                    isLoading -> {
-                        LazyColumn(
-                            modifier = Modifier.height(240.dp),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(2) { ShimmerLoadingCard() }
-                        }
-                    }
-
-                    nearbySecrets.isEmpty() -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when {
+                        isLoading -> {
+                            LazyColumn(
+                                state = lazyListState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                Text("🔍", style = MaterialTheme.typography.displayMedium)
-                                Text(
-                                    text = "No secrets nearby",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Be the first to drop one!",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.6f)
-                                )
+                                items(if (sheetState == SheetState.FULLY_EXPANDED) 5 else 2) {
+                                    ShimmerFeedCard()
+                                }
                             }
                         }
-                    }
 
-                    else -> {
-                        LazyColumn(
-                            modifier = Modifier.height(240.dp),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(nearbySecrets.take(3), key = { it.id }) { secret ->
-                                CompactSecretCard(secret = secret) { onSecretClick(secret) }
-                            }
-
-                            if (nearbySecrets.size > 3) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onFeedClick() }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
+                        nearbySecrets.isEmpty() -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("🔍", style = MaterialTheme.typography.displayMedium)
+                                    Text(
+                                        text = "No secrets nearby",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Be the first to drop one!",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = onDropSecretClick,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = TealPrimary
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "See ${nearbySecrets.size - 3} more secrets",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = TealPrimary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowUp,
-                                                contentDescription = null,
-                                                tint = TealPrimary,
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Drop Secret")
+                                    }
+                                }
+                            }
+                        }
+
+                        else -> {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                LazyColumn(
+                                    state = lazyListState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 20.dp,
+                                        end = 20.dp,
+                                        top = 8.dp,
+                                        bottom = if (sheetState == SheetState.FULLY_EXPANDED) 100.dp else 20.dp
+                                    ),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(nearbySecrets, key = { it.id }) { secret ->
+                                        FeedSecretCard(
+                                            secret = secret,
+                                            onLikeClick = { /* TODO: Handle like */ },
+                                            onCommentClick = { onSecretClick(it) },
+                                            onMapClick = {
+                                                // Collapse sheet and focus on map location
+                                                focusedSecret = it
+                                                sheetState = SheetState.COLLAPSED
+                                            },
+                                            onCardClick = { onSecretClick(it) }
+                                        )
+                                    }
+
+                                    // Infinite scroll indicator
+                                    if (nearbySecrets.size >= 10) {
+                                        item {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 16.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    color = TealPrimary,
+                                                    modifier = Modifier.size(32.dp)
+                                                )
+                                            }
                                         }
                                     }
+                                }
+
+                                // Pull to refresh indicator
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = isRefreshing,
+                                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = TealPrimary,
+                                        modifier = Modifier.size(32.dp)
+                                    )
                                 }
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
+        }
 
-            Box(
+        // FAB fixed at bottom right corner - only visible when fully expanded
+        AnimatedVisibility(
+            visible = sheetState == SheetState.FULLY_EXPANDED,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 24.dp, end = 20.dp)
+        ) {
+            FloatingActionButton(
+                onClick = onDropSecretClick,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp, end = 20.dp),
-                contentAlignment = Alignment.BottomEnd
+                    .size(64.dp)
+                    .shadow(14.dp, CircleShape),
+                containerColor = Color(0xFFB71C1C),
+                contentColor = Color.White,
+                shape = CircleShape
             ) {
-                FloatingActionButton(
-                    onClick = onDropSecretClick,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .shadow(14.dp, CircleShape),
-                    containerColor = TealPrimary,
-                    contentColor = Color.White,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Drop Secret",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Drop Secret",
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 
@@ -492,15 +649,36 @@ fun CompactSecretCard(secret: Secret, onClick: () -> Unit) {
 fun MapViewComposable(
     currentLocation: Location,
     secrets: List<Secret>,
-    onMarkerClick: (Secret) -> Unit
+    onMarkerClick: (Secret) -> Unit,
+    focusedSecret: Secret? = null,
+    onFocusHandled: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycle = lifecycleOwner.lifecycle
 
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
     var isMapReady by remember { mutableStateOf(false) }
+    var mapLibreMapInstance by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
+
+    // Handle focusing on a specific secret when requested
+    LaunchedEffect(focusedSecret) {
+        focusedSecret?.let { secret ->
+            mapLibreMapInstance?.let { map ->
+                try {
+                    val secretPosition = LatLng(secret.latitude, secret.longitude)
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(secretPosition, 16.0),
+                        1500
+                    )
+                    onFocusHandled()
+                } catch (e: Exception) {
+                    println("Error focusing on secret: ${e.message}")
+                    onFocusHandled()
+                }
+            }
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -509,9 +687,8 @@ fun MapViewComposable(
                 mapView?.onPause()
                 mapView?.onStop()
                 mapView?.onDestroy()
-            } catch (e: Exception) {
-                println("Cleanup error: ${e.message}")
-                e.printStackTrace()
+            } catch (_: Exception) {
+                println("Cleanup error")
             }
             symbolManager = null
             mapView = null
@@ -528,7 +705,7 @@ fun MapViewComposable(
                     try {
                         MapLibre.getInstance(ctx)
                         println("MapLibre already initialized")
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // MapLibre not initialized, initialize it now
                         println("Initializing MapLibre...")
                         MapLibre.getInstance(ctx)
@@ -555,6 +732,8 @@ fun MapViewComposable(
                             try {
                                 this.getMapAsync { mapLibreMap ->
                                     println("✅ getMapAsync callback triggered!")
+                                    // Store the map instance for camera control
+                                    mapLibreMapInstance = mapLibreMap
                                     try {
                                         println("Loading style...")
                                         val styleUrl = "https://api.maptiler.com/maps/streets-v2/style.json?key=${BuildConfig.MAPTILER_API_KEY}"
@@ -659,7 +838,7 @@ fun MapViewComposable(
 
     // Timeout fallback
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(15000)
+        delay(15000)
         if (!isMapReady) {
             println("⚠️ Map loading timeout after 15 seconds - forcing show")
             isMapReady = true
@@ -673,33 +852,29 @@ fun MapViewComposable(
                 Lifecycle.Event.ON_PAUSE -> {
                     try {
                         mapView?.onPause()
-                    } catch (e: Exception) {
-                        println("onPause error: ${e.message}")
-                        e.printStackTrace()
+                    } catch (_: Exception) {
+                        println("onPause error")
                     }
                 }
                 Lifecycle.Event.ON_RESUME -> {
                     try {
                         mapView?.onResume()
-                    } catch (e: Exception) {
-                        println("onResume error: ${e.message}")
-                        e.printStackTrace()
+                    } catch (_: Exception) {
+                        println("onResume error")
                     }
                 }
                 Lifecycle.Event.ON_STOP -> {
                     try {
                         mapView?.onStop()
-                    } catch (e: Exception) {
-                        println("onStop error: ${e.message}")
-                        e.printStackTrace()
+                    } catch (_: Exception) {
+                        println("onStop error")
                     }
                 }
                 Lifecycle.Event.ON_START -> {
                     try {
                         mapView?.onStart()
-                    } catch (e: Exception) {
-                        println("onStart error: ${e.message}")
-                        e.printStackTrace()
+                    } catch (_: Exception) {
+                        println("onStart error")
                     }
                 }
                 Lifecycle.Event.ON_DESTROY -> {
@@ -709,9 +884,8 @@ fun MapViewComposable(
                         symbolManager = null
                         mapView?.onDestroy()
                         mapView = null
-                    } catch (e: Exception) {
-                        println("onDestroy error: ${e.message}")
-                        e.printStackTrace()
+                    } catch (_: Exception) {
+                        println("onDestroy error")
                     }
                 }
                 else -> {}
