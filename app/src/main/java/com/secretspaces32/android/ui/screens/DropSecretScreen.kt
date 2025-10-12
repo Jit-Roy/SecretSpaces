@@ -14,7 +14,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,22 +26,65 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropSecretScreen(
     isLoading: Boolean,
     onPostSecret: (String, Uri?, Boolean) -> Unit,
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    cacheDir: File? = null
 ) {
     var secretText by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var isAnonymous by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
+    // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         selectedImageUri = uri
+    }
+
+    // GIF picker launcher
+    val gifPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (!success) {
+            // If photo was not taken, clear the URI
+            selectedImageUri = null
+        }
+    }
+
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Create temp file for camera image
+            cacheDir?.let { dir ->
+                val photoFile = File.createTempFile(
+                    "secret_photo_${System.currentTimeMillis()}",
+                    ".jpg",
+                    dir
+                )
+                val photoUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "com.secretspaces32.android.fileprovider",
+                    photoFile
+                )
+                selectedImageUri = photoUri
+                cameraLauncher.launch(photoUri)
+            }
+        }
     }
 
     Box(
@@ -76,7 +120,7 @@ fun DropSecretScreen(
                     }
 
                     Text(
-                        text = "Drop a Secret 🤫",
+                        text = "Drop a Secret",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -96,72 +140,15 @@ fun DropSecretScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Location indicator
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF121212),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFF4D4D).copy(alpha = 0.2f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = Color(0xFFFF4D4D),
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Current Location",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFFFF4D4D),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Your secret will be dropped here",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                }
-
                 // Secret text input
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF121212),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
-                    )
+                    color = Color(0xFF121212)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Text(
-                            text = "Your Secret",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
                         OutlinedTextField(
                             value = secretText,
                             onValueChange = { secretText = it },
@@ -170,15 +157,15 @@ fun DropSecretScreen(
                                 .heightIn(min = 150.dp),
                             placeholder = {
                                 Text(
-                                    text = "What's on your mind? Share it anonymously...",
+                                    text = "What's on your mind?",
                                     color = Color.White.copy(alpha = 0.5f)
                                 )
                             },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFFFF4D4D),
-                                unfocusedBorderColor = Color(0xFFFF4D4D).copy(alpha = 0.3f),
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
                                 cursorColor = Color(0xFFFF4D4D),
                                 focusedContainerColor = Color(0xFF1C1C1C),
                                 unfocusedContainerColor = Color(0xFF1C1C1C)
@@ -197,56 +184,111 @@ fun DropSecretScreen(
                     }
                 }
 
-                // Image attachment
+                // Attachment options
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF121212),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
-                    )
+                    color = Color(0xFF121212)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
                     ) {
+                        // Attachment buttons row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                text = "Add Image (Optional)",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            if (selectedImageUri == null) {
-                                Button(
-                                    onClick = { imagePickerLauncher.launch("image/*") },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFF4D4D).copy(alpha = 0.2f)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
+                            // Image picker button
+                            Button(
+                                onClick = { imagePickerLauncher.launch("image/*") },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF4D4D).copy(alpha = 0.2f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Image,
                                         contentDescription = "Add Image",
-                                        tint = Color(0xFFFF4D4D)
+                                        tint = Color(0xFFFF4D4D),
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Choose", color = Color(0xFFFF4D4D))
+                                    Text(
+                                        "Image",
+                                        color = Color(0xFFFF4D4D),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+
+                            // Camera button
+                            Button(
+                                onClick = {
+                                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF4D4D).copy(alpha = 0.2f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Take Photo",
+                                        tint = Color(0xFFFF4D4D),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        "Camera",
+                                        color = Color(0xFFFF4D4D),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+
+                            // GIF picker button
+                            Button(
+                                onClick = { gifPickerLauncher.launch("image/gif") },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF4D4D).copy(alpha = 0.2f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Gif,
+                                        contentDescription = "Add GIF",
+                                        tint = Color(0xFFFF4D4D),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        "GIF",
+                                        color = Color(0xFFFF4D4D),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }
 
+                        // Display selected media
                         selectedImageUri?.let { uri ->
                             Spacer(modifier = Modifier.height(12.dp))
                             Box {
                                 AsyncImage(
                                     model = uri,
-                                    contentDescription = "Selected image",
+                                    contentDescription = "Selected media",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 200.dp)
@@ -263,7 +305,7 @@ fun DropSecretScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove image",
+                                        contentDescription = "Remove media",
                                         tint = Color.White,
                                         modifier = Modifier.padding(8.dp)
                                     )
@@ -273,58 +315,13 @@ fun DropSecretScreen(
                     }
                 }
 
-                // Anonymous toggle
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF121212),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "🕶️ Post Anonymously",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Hide your identity from others",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                        }
-
-                        Switch(
-                            checked = isAnonymous,
-                            onCheckedChange = { isAnonymous = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFFFF4D4D),
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Color(0xFF3C3C3C)
-                            )
-                        )
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Drop button
                 Button(
                     onClick = {
                         if (secretText.isNotBlank()) {
-                            onPostSecret(secretText, selectedImageUri, isAnonymous)
+                            onPostSecret(secretText, selectedImageUri, false)
                         }
                     },
                     modifier = Modifier

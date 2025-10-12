@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 enum class Screen {
     Auth,
     Map,
-    Feed,
     DropSecret,
     Profile,
     MySecrets,
@@ -221,26 +220,9 @@ fun SecretSpacesApp() {
                 onProfileClick = {
                     selectedScreen = Screen.Profile
                 },
-                onFeedClick = {
-                    selectedScreen = Screen.Feed
-                },
                 initialSheetState = mapSheetState,
                 onSheetStateChange = { newState ->
                     mapSheetState = newState
-                }
-            )
-        }
-
-        Screen.Feed -> {
-            FeedScreen(
-                secrets = uiState.secrets,
-                isLoading = uiState.isLoading,
-                onSecretClick = { secret ->
-                    viewModel.selectSecret(secret)
-                    selectedScreen = Screen.SecretDetail
-                },
-                onBackClick = {
-                    selectedScreen = Screen.Map
                 }
             )
         }
@@ -254,7 +236,8 @@ fun SecretSpacesApp() {
                 },
                 onBack = {
                     selectedScreen = Screen.Map
-                }
+                },
+                cacheDir = context.cacheDir
             )
         }
 

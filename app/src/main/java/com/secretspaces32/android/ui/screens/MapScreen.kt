@@ -64,7 +64,6 @@ fun MapScreen(
     onSecretClick: (Secret) -> Unit,
     onDropSecretClick: () -> Unit,
     onProfileClick: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onFeedClick: () -> Unit,
     initialSheetState: String = "COLLAPSED",
     onSheetStateChange: (String) -> Unit = {}
 ) {
