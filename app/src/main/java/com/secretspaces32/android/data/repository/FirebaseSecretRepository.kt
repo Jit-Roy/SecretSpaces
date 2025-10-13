@@ -27,7 +27,10 @@ class FirebaseSecretRepository {
         longitude: Double,
         username: String,
         userProfilePicture: String?,
-        isAnonymous: Boolean
+        isAnonymous: Boolean,
+        mood: String? = null,
+        category: String? = null,
+        hashtags: String? = null
     ): Result<Secret> {
         return try {
             val userId = auth.currentUser?.uid ?: return Result.failure(Exception("Not authenticated"))
@@ -48,7 +51,10 @@ class FirebaseSecretRepository {
                 userProfilePicture = if (isAnonymous) null else userProfilePicture,
                 isAnonymous = isAnonymous,
                 likeCount = 0,
-                commentCount = 0
+                commentCount = 0,
+                mood = mood,
+                category = category,
+                hashtags = hashtags
             )
 
             secretsCollection.document(secretId).set(secret).await()

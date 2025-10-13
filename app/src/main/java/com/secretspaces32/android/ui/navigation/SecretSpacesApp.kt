@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 
 enum class Screen {
     Auth,
+    Feed,
     Map,
     DropSecret,
     Profile,
@@ -41,7 +42,7 @@ fun SecretSpacesApp() {
     )
 
     val uiState by viewModel.uiState.collectAsState()
-    var selectedScreen by remember { mutableStateOf(Screen.Map) }
+    var selectedScreen by remember { mutableStateOf(Screen.Feed) }
 
     // Persist the sheet state at navigation level so it survives screen changes
     var mapSheetState by rememberSaveable { mutableStateOf("COLLAPSED") }
@@ -205,10 +206,12 @@ fun SecretSpacesApp() {
 
     // Main app navigation
     when (selectedScreen) {
-        Screen.Map -> {
-            MapScreen(
+        Screen.Feed, Screen.Map, Screen.Profile -> {
+            MainScreenContainer(
                 currentLocation = uiState.currentLocation,
                 nearbySecrets = uiState.secrets,
+                currentUser = uiState.currentUser,
+                mySecrets = uiState.mySecrets,
                 isLoading = uiState.isLoading,
                 onSecretClick = { secret ->
                     viewModel.selectSecret(secret)
@@ -217,12 +220,18 @@ fun SecretSpacesApp() {
                 onDropSecretClick = {
                     selectedScreen = Screen.DropSecret
                 },
-                onProfileClick = {
-                    selectedScreen = Screen.Profile
+                onSignOut = {
+                    viewModel.signOut()
+                    selectedScreen = Screen.Feed
                 },
-                initialSheetState = mapSheetState,
-                onSheetStateChange = { newState ->
-                    mapSheetState = newState
+                onUpdateProfile = { username, bio, imageUri ->
+                    viewModel.updateProfile(username, bio, imageUri)
+                },
+                onLikeClick = { secret ->
+                    viewModel.toggleLike(secret)
+                },
+                onLoadMySecrets = {
+                    viewModel.loadMySecrets()
                 }
             )
         }
@@ -230,12 +239,12 @@ fun SecretSpacesApp() {
         Screen.DropSecret -> {
             DropSecretScreen(
                 isLoading = uiState.isLoading,
-                onPostSecret = { text, imageUri, isAnonymous ->
-                    viewModel.createSecret(text, imageUri, isAnonymous)
-                    selectedScreen = Screen.Map
+                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
+                    viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
+                    selectedScreen = Screen.Feed
                 },
                 onBack = {
-                    selectedScreen = Screen.Map
+                    selectedScreen = Screen.Feed
                 },
                 cacheDir = context.cacheDir
             )
@@ -252,7 +261,7 @@ fun SecretSpacesApp() {
                 mySecrets = uiState.mySecrets,
                 onSignOut = {
                     viewModel.signOut()
-                    selectedScreen = Screen.Map
+                    selectedScreen = Screen.Feed
                 },
                 onUpdateProfile = { username, bio, imageUri ->
                     viewModel.updateProfile(username, bio, imageUri)
@@ -261,7 +270,7 @@ fun SecretSpacesApp() {
                     selectedScreen = Screen.MySecrets
                 },
                 onBackClick = {
-                    selectedScreen = Screen.Map
+                    selectedScreen = Screen.Feed
                 },
                 isLoading = uiState.isLoading
             )
@@ -292,7 +301,7 @@ fun SecretSpacesApp() {
                         viewModel.addComment(secret.id, commentText)
                     },
                     onBack = {
-                        selectedScreen = Screen.Map
+                        selectedScreen = Screen.Feed
                     },
                     isLoading = uiState.isLoading
                 )

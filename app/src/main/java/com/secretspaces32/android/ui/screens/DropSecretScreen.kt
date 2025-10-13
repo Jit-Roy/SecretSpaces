@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Gif
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +25,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import java.io.File
 
@@ -32,13 +35,20 @@ import java.io.File
 @Composable
 fun DropSecretScreen(
     isLoading: Boolean,
-    onPostSecret: (String, Uri?, Boolean) -> Unit,
+    onPostSecret: (String, Uri?, Boolean, String?, String?, String?) -> Unit,
     onBack: () -> Unit = {},
     cacheDir: File? = null
 ) {
     var secretText by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedMood by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Confession") }
+    var showCategoryDropdown by remember { mutableStateOf(false) }
+    var hashtags by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val moods = listOf("😔", "😡", "😍", "🤔")
+    val categories = listOf("Confession", "Rant", "Crush", "Fear", "Funny", "Love", "Work", "Life")
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -140,6 +150,123 @@ fun DropSecretScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                // Mood Selector
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF121212)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "How are you feeling?",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            moods.forEach { mood ->
+                                Surface(
+                                    onClick = { selectedMood = if (selectedMood == mood) "" else mood },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (selectedMood == mood)
+                                        Color(0xFFFF4D4D).copy(alpha = 0.3f)
+                                    else
+                                        Color(0xFF1C1C1C)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = mood,
+                                            fontSize = 28.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Category Selector
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF121212)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Category",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Box {
+                            Surface(
+                                onClick = { showCategoryDropdown = !showCategoryDropdown },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF1C1C1C)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = selectedCategory,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Dropdown",
+                                        tint = Color(0xFFFF4D4D)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showCategoryDropdown,
+                                onDismissRequest = { showCategoryDropdown = false },
+                                modifier = Modifier
+                                    .fillMaxWidth(0.87f)
+                                    .background(Color(0xFF1C1C1C))
+                            ) {
+                                categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = category,
+                                                color = Color.White
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedCategory = category
+                                            showCategoryDropdown = false
+                                        },
+                                        colors = MenuDefaults.itemColors(
+                                            textColor = Color.White
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Secret text input
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -158,7 +285,61 @@ fun DropSecretScreen(
                             placeholder = {
                                 Text(
                                     text = "What's on your mind?",
-                                    color = Color.White.copy(alpha = 0.5f)
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontFamily = FontFamily.Default
+                                )
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                cursorColor = Color(0xFFFF4D4D),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            ),
+                            textStyle = LocalTextStyle.current.copy(
+                                fontFamily = FontFamily.Default
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            maxLines = 10
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "${secretText.length}/500 characters",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+
+                // Hashtags
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF121212)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Hashtags (optional)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = hashtags,
+                            onValueChange = { hashtags = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(
+                                    text = "#secret #anonymous #confession",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 14.sp
                                 )
                             },
                             colors = OutlinedTextFieldDefaults.colors(
@@ -171,15 +352,7 @@ fun DropSecretScreen(
                                 unfocusedContainerColor = Color(0xFF1C1C1C)
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            maxLines = 10
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "${secretText.length}/500 characters",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.5f)
+                            maxLines = 2
                         )
                     }
                 }
@@ -321,7 +494,7 @@ fun DropSecretScreen(
                 Button(
                     onClick = {
                         if (secretText.isNotBlank()) {
-                            onPostSecret(secretText, selectedImageUri, false)
+                            onPostSecret(secretText, selectedImageUri, false, selectedMood, selectedCategory, hashtags)
                         }
                     },
                     modifier = Modifier

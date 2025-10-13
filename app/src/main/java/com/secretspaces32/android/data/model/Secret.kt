@@ -14,7 +14,10 @@ data class Secret(
     val likeCount: Int = 0,
     val commentCount: Int = 0,
     val distance: Double? = null, // Distance from user in meters
-    val isLikedByCurrentUser: Boolean = false
+    val isLikedByCurrentUser: Boolean = false,
+    val mood: String? = null,
+    val category: String? = null,
+    val hashtags: String? = null
 )
 
 data class CreateSecretRequest(

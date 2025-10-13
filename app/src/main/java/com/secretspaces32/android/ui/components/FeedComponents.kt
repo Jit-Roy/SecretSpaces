@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,115 +45,93 @@ fun FeedSecretCard(
     var isExpanded by remember { mutableStateOf(false) }
     val maxLines = if (isExpanded) Int.MAX_VALUE else 4
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = Color.Black.copy(alpha = 0.3f)
-            ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = DarkSurface.copy(alpha = 0.95f)
-        )
+            .background(Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        // Header: Profile info + distance/time
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header: Profile info + distance/time
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                // Profile Picture or Anonymous Avatar
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Profile Picture or Anonymous Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (secret.isAnonymous) {
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFF6B46C1),
-                                            Color(0xFF9333EA)
-                                        )
-                                    )
-                                } else {
-                                    Brush.linearGradient(
-                                        colors = listOf(TealPrimary, AquaGreen)
-                                    )
-                                }
-                            )
-                            .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (secret.isAnonymous || secret.userProfilePicture.isNullOrEmpty()) {
-                            Text(
-                                text = if (secret.isAnonymous) "👤" else "👁️",
-                                fontSize = 20.sp
-                            )
-                        } else {
-                            AsyncImage(
-                                model = secret.userProfilePicture,
-                                contentDescription = "Profile",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-
-                    // Username + metadata
-                    Column {
-                        Text(
-                            text = if (secret.isAnonymous) "Anonymous" else secret.username.ifEmpty { "Secret Keeper" },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                    if (secret.isAnonymous || secret.userProfilePicture.isNullOrEmpty()) {
+                        Icon(
+                            imageVector = if (secret.isAnonymous) Icons.Default.Person else Icons.Default.AccountCircle,
+                            contentDescription = "Profile",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp)
                         )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            secret.distance?.let { distance ->
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = null,
-                                        tint = AquaGreen,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = LocationHelper.formatDistance(distance),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AquaGreen
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "·",
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = LocationHelper.formatTimestamp(secret.timestamp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
-                        }
+                    } else {
+                        AsyncImage(
+                            model = secret.userProfilePicture,
+                            contentDescription = "Profile",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                 }
 
-                // Tag/Category
+                // Username + metadata
+                Column {
+                    Text(
+                        text = if (secret.isAnonymous) "Anonymous" else secret.username.ifEmpty { "Secret Keeper" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        secret.distance?.let { distance ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = AquaGreen,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = LocationHelper.formatDistance(distance),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AquaGreen
+                                )
+                            }
+                        }
+                        Text(
+                            text = "·",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 10.sp
+                        )
+                        Text(
+                            text = LocationHelper.formatTimestamp(secret.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+
+            // Category Tag
+            secret.category?.let { category ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF6B46C1).copy(alpha = 0.3f),
@@ -162,7 +142,7 @@ fun FeedSecretCard(
                     )
                 ) {
                     Text(
-                        text = "🔮 Secret",
+                        text = category,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFFE9D5FF),
@@ -171,117 +151,153 @@ fun FeedSecretCard(
                     )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Body: Secret text
-            Column {
-                Text(
-                    text = secret.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White,
-                    lineHeight = 24.sp,
-                    maxLines = maxLines,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // "Read more" button if text is long
-                if (secret.text.length > 150 && !isExpanded) {
-                    Text(
-                        text = "Read more...",
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clickable { isExpanded = true },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TealPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                if (isExpanded && secret.text.length > 150) {
-                    Text(
-                        text = "Show less",
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clickable { isExpanded = false },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TealPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            // Optional: Image if present
-            secret.imageUrl?.let { imageUrl ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                ) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "Secret image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    // Gradient overlay for better visibility
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.3f)
-                                    )
-                                )
-                            )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Divider
-            HorizontalDivider(
-                color = Color.White.copy(alpha = 0.1f),
-                thickness = 1.dp
-            )
-
+        // Mood and Hashtags Row
+        if (!secret.mood.isNullOrEmpty() || !secret.hashtags.isNullOrEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
-
-            // Footer: Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Like button
-                FeedActionButton(
-                    icon = if (secret.isLikedByCurrentUser) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    label = if (secret.likeCount > 0) "${secret.likeCount}" else "Like",
-                    tint = if (secret.isLikedByCurrentUser) Color(0xFFFF4081) else Color.White.copy(alpha = 0.7f),
-                    onClick = { onLikeClick(secret) }
-                )
+                // Mood emoji
+                secret.mood?.let { mood ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFF4D4D).copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = mood,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 16.sp
+                        )
+                    }
+                }
 
-                // Comment button
-                FeedActionButton(
-                    icon = Icons.Default.ChatBubbleOutline,
-                    label = if (secret.commentCount > 0) "${secret.commentCount}" else "Comment",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    onClick = { onCommentClick(secret) }
-                )
+                // Hashtags
+                secret.hashtags?.takeIf { it.isNotEmpty() }?.let { hashtags ->
+                    Text(
+                        text = hashtags,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TealPrimary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
 
-                // Map button
-                FeedActionButton(
-                    icon = Icons.Default.Place,
-                    label = "Map",
-                    tint = AquaGreen.copy(alpha = 0.9f),
-                    onClick = { onMapClick(secret) }
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Body: Secret text
+        Column {
+            Text(
+                text = secret.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White,
+                lineHeight = 24.sp,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // "Read more" button if text is long
+            if (secret.text.length > 150 && !isExpanded) {
+                Text(
+                    text = "Read more...",
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable { isExpanded = true },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TealPrimary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            if (isExpanded && secret.text.length > 150) {
+                Text(
+                    text = "Show less",
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable { isExpanded = false },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TealPrimary,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
+
+        // Optional: Image if present
+        secret.imageUrl?.let { imageUrl ->
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            ) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = "Secret image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                // Gradient overlay for better visibility
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.3f)
+                                )
+                            )
+                        )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Footer: Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Like button
+            FeedActionButton(
+                icon = if (secret.isLikedByCurrentUser) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                label = if (secret.likeCount > 0) "${secret.likeCount}" else "Like",
+                tint = if (secret.isLikedByCurrentUser) Color(0xFFFF4081) else Color.White.copy(alpha = 0.7f),
+                onClick = { onLikeClick(secret) }
+            )
+
+            // Comment button
+            FeedActionButton(
+                icon = Icons.Default.ChatBubbleOutline,
+                label = if (secret.commentCount > 0) "${secret.commentCount}" else "Comment",
+                tint = Color.White.copy(alpha = 0.7f),
+                onClick = { onCommentClick(secret) }
+            )
+
+            // Map button
+            FeedActionButton(
+                icon = Icons.Default.Place,
+                label = "Map",
+                tint = AquaGreen.copy(alpha = 0.9f),
+                onClick = { onMapClick(secret) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Thin horizontal divider to separate posts
+        HorizontalDivider(
+            color = Color.White.copy(alpha = 0.15f),
+            thickness = 0.5.dp
+        )
     }
 }
 
@@ -317,78 +333,79 @@ fun FeedActionButton(
 
 @Composable
 fun ShimmerFeedCard() {
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(20.dp)),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = DarkSurface.copy(alpha = 0.95f)
-        )
+            .background(Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(shimmerBrush())
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(shimmerBrush())
-                )
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(100.dp)
-                            .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(shimmerBrush())
-                    )
-                    Box(
-                        modifier = Modifier
-                            .width(140.dp)
-                            .height(12.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(shimmerBrush())
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            repeat(3) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                        .width(100.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(shimmerBrush())
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                repeat(3) {
-                    Box(
-                        modifier = Modifier
-                            .width(70.dp)
-                            .height(16.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(shimmerBrush())
-                    )
-                }
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerBrush())
+                )
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        repeat(3) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(shimmerBrush())
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .width(70.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(shimmerBrush())
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Divider for shimmer card too
+        HorizontalDivider(
+            color = Color.White.copy(alpha = 0.15f),
+            thickness = 0.5.dp
+        )
     }
 }
 

@@ -313,7 +313,7 @@ class MainViewModel(
         }
     }
 
-    fun createSecret(text: String, imageUri: Uri?, isAnonymous: Boolean) {
+    fun createSecret(text: String, imageUri: Uri?, isAnonymous: Boolean, mood: String? = null, category: String? = null, hashtags: String? = null) {
         viewModelScope.launch {
             val location = _uiState.value.currentLocation
             val user = _uiState.value.currentUser
@@ -337,7 +337,10 @@ class MainViewModel(
                 longitude = location.longitude,
                 username = user.username,
                 userProfilePicture = user.profilePictureUrl,
-                isAnonymous = isAnonymous
+                isAnonymous = isAnonymous,
+                mood = mood,
+                category = category,
+                hashtags = hashtags
             )
 
             result.onSuccess {
