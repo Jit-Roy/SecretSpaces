@@ -40,7 +40,7 @@ import java.io.File
 @Composable
 fun DropSecretScreen(
     isLoading: Boolean,
-    onPostSecret: (String, Uri?, Boolean, String?, String?, String?) -> Unit,
+    onPostSecret: (String, Uri?, Boolean, String?, String?, String?, String) -> Unit,
     onBack: () -> Unit = {},
     cacheDir: File? = null,
     currentUser: User? = null
@@ -133,7 +133,7 @@ fun DropSecretScreen(
                         IconButton(
                             onClick = {
                                 if (secretText.isNotBlank()) {
-                                    onPostSecret(secretText, selectedImageUri, false, null, null, null)
+                                    onPostSecret(secretText, selectedImageUri, false, null, null, null, selectedPostType)
                                 }
                             },
                             enabled = secretText.isNotBlank() && !isLoading

@@ -11,8 +11,9 @@ import com.secretspaces32.android.data.model.Secret
 import com.secretspaces32.android.data.model.User
 import com.secretspaces32.android.data.model.UpdateUserRequest
 import com.secretspaces32.android.data.repository.AuthRepository
-import com.secretspaces32.android.data.repository.FirebaseSecretRepository
-import com.secretspaces32.android.data.repository.FirebaseUserRepository
+import com.secretspaces32.android.data.repository.SecretRepository
+import com.secretspaces32.android.data.repository.StoryRepository
+import com.secretspaces32.android.data.repository.UserRepository
 import com.secretspaces32.android.utils.LocationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,10 @@ data class AppUiState(
     val isLoading: Boolean = false,
     val isEmailAuthLoading: Boolean = false,
     val isGoogleAuthLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
+    val selectedUserStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
+    val currentStoryIndex: Int = 0
 )
 
 class MainViewModel(
@@ -39,8 +43,9 @@ class MainViewModel(
 ) : ViewModel() {
 
     private val authRepository = AuthRepository()
-    private val userRepository = FirebaseUserRepository()
-    private val secretRepository = FirebaseSecretRepository()
+    private val userRepository = UserRepository(context)
+    private val secretRepository = SecretRepository(context)
+    private val storyRepository = StoryRepository(context)
     private val locationHelper = LocationHelper(context)
 
     private val _uiState = MutableStateFlow(AppUiState())
@@ -190,7 +195,7 @@ class MainViewModel(
                 var profilePictureUrl: String? = null
 
                 if (imageUri != null) {
-                    val uploadResult = userRepository.uploadProfilePicture(userId, imageUri)
+                    val uploadResult = userRepository.uploadProfilePicture(imageUri)
                     uploadResult.onSuccess { url ->
                         profilePictureUrl = url
                     }
@@ -204,6 +209,11 @@ class MainViewModel(
 
                 val result = userRepository.updateUser(userId, updateRequest)
                 result.onSuccess {
+                    // Update profile picture in all existing secrets and comments
+                    if (profilePictureUrl != null) {
+                        secretRepository.updateUserProfilePictureInPosts(userId, profilePictureUrl)
+                    }
+
                     loadCurrentUser(userId)
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }.onFailure { e ->
@@ -327,6 +337,101 @@ class MainViewModel(
                 )
             }
         }
+    }
+
+    fun createStory(imageUri: Uri?, caption: String?) {
+        viewModelScope.launch {
+            val user = _uiState.value.currentUser
+
+            if (user == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "User not authenticated")
+                return@launch
+            }
+
+            if (imageUri == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Story requires an image")
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            val result = storyRepository.createStory(
+                imageUri = imageUri,
+                caption = caption,
+                username = user.username,
+                userProfilePicture = user.profilePictureUrl
+            )
+
+            result.onSuccess {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                // Reload user's stories after creating a new one
+                loadMyStories()
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to post story: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadMyStories() {
+        viewModelScope.launch {
+            val userId = _uiState.value.currentUser?.id ?: return@launch
+
+            val result = storyRepository.getUserStories(userId)
+            result.onSuccess { stories ->
+                _uiState.value = _uiState.value.copy(myStories = stories)
+            }.onFailure { e ->
+                println("DEBUG: Failed to load stories: ${e.message}")
+            }
+        }
+    }
+
+    fun loadUserStories(userId: String) {
+        viewModelScope.launch {
+            println("DEBUG: loadUserStories called for userId: $userId")
+            val result = storyRepository.getUserStories(userId)
+            result.onSuccess { stories ->
+                println("DEBUG: Successfully loaded ${stories.size} stories")
+                stories.forEach { story ->
+                    println("DEBUG: Story - id: ${story.id}, imageUrl: ${story.imageUrl}")
+                }
+                _uiState.value = _uiState.value.copy(
+                    selectedUserStories = stories,
+                    currentStoryIndex = 0
+                )
+                println("DEBUG: UI state updated with stories")
+            }.onFailure { e ->
+                println("DEBUG: Failed to load stories: ${e.message}")
+                e.printStackTrace()
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Failed to load stories: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun nextStory() {
+        val currentIndex = _uiState.value.currentStoryIndex
+        val storiesCount = _uiState.value.selectedUserStories.size
+        if (currentIndex < storiesCount - 1) {
+            _uiState.value = _uiState.value.copy(currentStoryIndex = currentIndex + 1)
+        }
+    }
+
+    fun previousStory() {
+        val currentIndex = _uiState.value.currentStoryIndex
+        if (currentIndex > 0) {
+            _uiState.value = _uiState.value.copy(currentStoryIndex = currentIndex - 1)
+        }
+    }
+
+    fun clearSelectedStories() {
+        _uiState.value = _uiState.value.copy(
+            selectedUserStories = emptyList(),
+            currentStoryIndex = 0
+        )
     }
 
     fun toggleLike(secret: Secret) {

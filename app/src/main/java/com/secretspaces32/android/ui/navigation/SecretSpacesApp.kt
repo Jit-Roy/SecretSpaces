@@ -25,7 +25,8 @@ enum class Screen {
     DropSecret,
     Profile,
     MySecrets,
-    SecretDetail
+    SecretDetail,
+    StoryViewer
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -210,10 +211,30 @@ fun SecretSpacesApp() {
                 onLocationPermissionGranted = {
                     viewModel.updateLocation()
                 },
-                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
-                    viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
+                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags, postType ->
+                    if (postType == "Story") {
+                        viewModel.createStory(imageUri, text)
+                    } else {
+                        viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
+                    }
                 },
-                cacheDir = context.cacheDir
+                cacheDir = context.cacheDir,
+                myStories = uiState.myStories,
+                onViewMyStory = {
+                    // Load current user's stories and navigate to story viewer
+                    println("DEBUG: onViewMyStory clicked")
+                    uiState.currentUser?.id?.let { userId ->
+                        println("DEBUG: Loading stories for user: $userId")
+                        viewModel.loadUserStories(userId)
+                        println("DEBUG: Navigating to StoryViewer")
+                        selectedScreen = Screen.StoryViewer
+                    } ?: run {
+                        println("DEBUG: No current user found")
+                    }
+                },
+                onLoadMyStories = {
+                    viewModel.loadMyStories()
+                }
             )
         }
 
@@ -254,6 +275,24 @@ fun SecretSpacesApp() {
                 )
             }
         }
+
+        Screen.StoryViewer -> {
+            StoryViewerScreen(
+                stories = uiState.selectedUserStories,
+                currentIndex = uiState.currentStoryIndex,
+                onNextStory = {
+                    viewModel.nextStory()
+                },
+                onPreviousStory = {
+                    viewModel.previousStory()
+                },
+                onClose = {
+                    viewModel.clearSelectedStories()
+                    selectedScreen = Screen.Feed
+                }
+            )
+        }
+
         Screen.Auth -> {
             // Should not reach here as we handle auth above
         }

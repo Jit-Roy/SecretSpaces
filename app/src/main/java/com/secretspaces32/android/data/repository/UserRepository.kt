@@ -1,17 +1,17 @@
 package com.secretspaces32.android.data.repository
 
+import android.content.Context
 import android.net.Uri
 import com.secretspaces32.android.data.model.User
 import com.secretspaces32.android.data.model.UpdateUserRequest
+import com.secretspaces32.android.data.storage.CloudinaryStorageManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
-class FirebaseUserRepository {
+class UserRepository(context: Context) {
     private val firestore = FirebaseFirestore.getInstance()
-    private val storage = FirebaseStorage.getInstance()
+    private val storageManager = CloudinaryStorageManager(context)
     private val auth = FirebaseAuth.getInstance()
 
     private val usersCollection = firestore.collection("users")
@@ -74,18 +74,8 @@ class FirebaseUserRepository {
         }
     }
 
-    suspend fun uploadProfilePicture(userId: String, imageUri: Uri): Result<String> {
-        return try {
-            val filename = "profile_${userId}_${UUID.randomUUID()}.jpg"
-            val ref = storage.reference.child("profile_pictures/$filename")
-
-            ref.putFile(imageUri).await()
-            val downloadUrl = ref.downloadUrl.await()
-
-            Result.success(downloadUrl.toString())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    suspend fun uploadProfilePicture(imageUri: Uri): Result<String> {
+        return storageManager.uploadProfilePicture(imageUri)
     }
 
     fun getCurrentUserId(): String? = auth.currentUser?.uid
@@ -95,7 +85,7 @@ class FirebaseUserRepository {
         return try {
             val document = usersCollection.document(userId).get().await()
             document.getString("username")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -105,7 +95,7 @@ class FirebaseUserRepository {
         return try {
             val document = usersCollection.document(userId).get().await()
             document.getString("profilePictureUrl")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -118,7 +108,7 @@ class FirebaseUserRepository {
                 .get()
                 .await()
             snapshot.size()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0
         }
     }
@@ -131,7 +121,7 @@ class FirebaseUserRepository {
                 .get()
                 .await()
             snapshot.size()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0
         }
     }
@@ -170,7 +160,7 @@ class FirebaseUserRepository {
             val followId = "${currentUserId}_${targetUserId}"
             val document = followsCollection.document(followId).get().await()
             document.exists()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }

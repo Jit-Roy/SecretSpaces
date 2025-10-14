@@ -73,7 +73,10 @@ dependencies {
     // Firebase dependencies
     implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
-    implementation("com.google.firebase:firebase-storage-ktx:21.0.2")
+
+    // Cloudinary for image storage
+    implementation("com.cloudinary:cloudinary-android:3.1.2")
+    implementation("com.cloudinary:cloudinary-core:2.3.2")
 
     // Google Sign-In with Credential Manager (modern approach)
     implementation("androidx.credentials:credentials:1.5.0")

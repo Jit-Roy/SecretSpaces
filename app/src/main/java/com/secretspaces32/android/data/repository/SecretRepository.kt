@@ -1,19 +1,20 @@
 package com.secretspaces32.android.data.repository
 
+import android.content.Context
 import android.net.Uri
 import com.secretspaces32.android.data.model.Comment
 import com.secretspaces32.android.data.model.Like
 import com.secretspaces32.android.data.model.Secret
+import com.secretspaces32.android.data.storage.CloudinaryStorageManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
-class FirebaseSecretRepository {
+class SecretRepository(context: Context) {
     private val firestore = FirebaseFirestore.getInstance()
-    private val storage = FirebaseStorage.getInstance()
+    private val storageManager = CloudinaryStorageManager(context)
     private val auth = FirebaseAuth.getInstance()
 
     private val secretsCollection = firestore.collection("secrets")
@@ -35,10 +36,13 @@ class FirebaseSecretRepository {
         return try {
             val userId = auth.currentUser?.uid ?: return Result.failure(Exception("Not authenticated"))
 
-            // Upload image if provided
-            val imageUrl = imageUri?.let { uploadSecretImage(it) }?.getOrNull()
-
             val secretId = UUID.randomUUID().toString()
+
+            // Upload image if provided using the centralized storage manager
+            val imageUrl = imageUri?.let {
+                storageManager.uploadPostImage(it, secretId).getOrNull()
+            }
+
             val secret = Secret(
                 id = secretId,
                 text = text,
@@ -241,26 +245,12 @@ class FirebaseSecretRepository {
         }
     }
 
-    private suspend fun uploadSecretImage(imageUri: Uri): Result<String> {
-        return try {
-            val filename = "secret_${UUID.randomUUID()}.jpg"
-            val ref = storage.reference.child("secret_images/$filename")
-
-            ref.putFile(imageUri).await()
-            val downloadUrl = ref.downloadUrl.await()
-
-            Result.success(downloadUrl.toString())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     private suspend fun checkIfUserLikedSecret(secretId: String, userId: String): Boolean {
         return try {
             val likeId = "${userId}_$secretId"
             val snapshot = likesCollection.document(likeId).get().await()
             snapshot.exists()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -276,5 +266,44 @@ class FirebaseSecretRepository {
 
         val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         return earthRadius * c
+    }
+
+    /**
+     * Update profile picture URL for all secrets and comments by a user
+     * Call this when user updates their profile picture
+     */
+    suspend fun updateUserProfilePictureInPosts(userId: String, newProfilePictureUrl: String?): Result<Unit> {
+        return try {
+            // Update all non-anonymous secrets by this user
+            val secretsSnapshot = secretsCollection
+                .whereEqualTo("userId", userId)
+                .whereEqualTo("isAnonymous", false)
+                .get()
+                .await()
+
+            val batch = firestore.batch()
+
+            // Update secrets
+            secretsSnapshot.documents.forEach { doc ->
+                batch.update(doc.reference, "userProfilePicture", newProfilePictureUrl)
+            }
+
+            // Update comments
+            val commentsSnapshot = commentsCollection
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+
+            commentsSnapshot.documents.forEach { doc ->
+                batch.update(doc.reference, "userProfilePicture", newProfilePictureUrl)
+            }
+
+            // Commit all updates in a single batch
+            batch.commit().await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

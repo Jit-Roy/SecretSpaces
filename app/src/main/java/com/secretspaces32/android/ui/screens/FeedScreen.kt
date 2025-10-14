@@ -143,11 +143,8 @@ fun FeedScreen(
                         StoryItem(
                             story = story,
                             onClick = {
-                                if (story.isYourStory) {
-                                    onAddStoryClick()
-                                } else {
-                                    onStoryClick(story)
-                                }
+                                // Always call onStoryClick for viewing stories
+                                onStoryClick(story)
                             }
                         )
                     }

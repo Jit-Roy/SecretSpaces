@@ -24,8 +24,11 @@ fun MainScreenContainer(
     onLikeClick: (Secret) -> Unit = {},
     onLoadMySecrets: () -> Unit = {},
     onLocationPermissionGranted: () -> Unit = {},
-    onPostSecret: ((String, android.net.Uri?, Boolean, String?, String?, String?) -> Unit)? = null,
-    cacheDir: java.io.File? = null
+    onPostSecret: ((String, android.net.Uri?, Boolean, String?, String?, String?, String) -> Unit)? = null,
+    cacheDir: java.io.File? = null,
+    myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
+    onViewMyStory: () -> Unit = {},
+    onLoadMyStories: () -> Unit = {}
 ) {
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
@@ -35,6 +38,11 @@ fun MainScreenContainer(
         if (currentDestination == NavDestination.PROFILE) {
             onLoadMySecrets()
         }
+    }
+
+    // Load user stories when home is displayed
+    LaunchedEffect(Unit) {
+        onLoadMyStories()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -52,6 +60,19 @@ fun MainScreenContainer(
                     onMapClick = { secret ->
                         focusedSecret = secret
                         currentDestination = NavDestination.MAP
+                    },
+                    onAddStoryClick = {
+                        // Navigate to create story
+                        currentDestination = NavDestination.CREATE
+                    },
+                    onStoryClick = { story ->
+                        println("DEBUG: onStoryClick called for story: ${story.username}, isYourStory: ${story.isYourStory}")
+                        if (story.isYourStory) {
+                            // Always try to view your stories
+                            // The onViewMyStory will load them and navigate
+                            println("DEBUG: Calling onViewMyStory")
+                            onViewMyStory()
+                        }
                     }
                 )
             }
@@ -68,8 +89,8 @@ fun MainScreenContainer(
             NavDestination.CREATE -> {
                 DropSecretScreen(
                     isLoading = isLoading,
-                    onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
-                        onPostSecret?.invoke(text, imageUri, isAnonymous, mood, category, hashtags)
+                    onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags, postType ->
+                        onPostSecret?.invoke(text, imageUri, isAnonymous, mood, category, hashtags, postType)
                         currentDestination = NavDestination.HOME
                     },
                     onBack = {
