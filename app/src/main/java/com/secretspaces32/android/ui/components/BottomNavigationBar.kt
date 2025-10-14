@@ -29,79 +29,86 @@ fun BottomNavigationBar(
     onNavigate: (NavDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    // Wrap in Box with black background that extends to fill navigation bar area
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
-        color = Color.Black,
-        shadowElevation = 16.dp
+            .background(Color.Black) // Black background fills entire area
     ) {
-        Row(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp)
-                .background(Color.Black)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .navigationBarsPadding(), // Adds padding but background extends below
+            color = Color.Black,
+            shadowElevation = 16.dp
         ) {
-            // Home
-            NavItem(
-                icon = Icons.Outlined.Home,
-                label = "Home",
-                isSelected = currentDestination == NavDestination.HOME,
-                onClick = { onNavigate(NavDestination.HOME) }
-            )
-
-            // Map
-            NavItem(
-                icon = Icons.Outlined.LocationOn,
-                label = "Map",
-                isSelected = currentDestination == NavDestination.MAP,
-                onClick = { onNavigate(NavDestination.MAP) }
-            )
-
-            // Create (Center FAB)
-            IconButton(
-                onClick = { onNavigate(NavDestination.CREATE) },
-                modifier = Modifier.size(64.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(70.dp)
+                    .background(Color.Black)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
+                // Home
+                NavItem(
+                    icon = Icons.Outlined.Home,
+                    label = "Home",
+                    isSelected = currentDestination == NavDestination.HOME,
+                    onClick = { onNavigate(NavDestination.HOME) }
+                )
+
+                // Map
+                NavItem(
+                    icon = Icons.Outlined.LocationOn,
+                    label = "Map",
+                    isSelected = currentDestination == NavDestination.MAP,
+                    onClick = { onNavigate(NavDestination.MAP) }
+                )
+
+                // Create (Center FAB)
+                IconButton(
+                    onClick = { onNavigate(NavDestination.CREATE) },
+                    modifier = Modifier.size(64.dp)
                 ) {
-                    // Circle with plus icon
-                    Box(
-                        modifier = Modifier.size(56.dp),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        // Outer circle
-                        Icon(
-                            imageVector = Icons.Outlined.AddCircle,
-                            contentDescription = "Create",
-                            tint = if (currentDestination == NavDestination.CREATE) Color(0xFFE85D75) else Color.White,
-                            modifier = Modifier.size(56.dp)
-                        )
+                        // Circle with plus icon
+                        Box(
+                            modifier = Modifier.size(56.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Outer circle
+                            Icon(
+                                imageVector = Icons.Outlined.AddCircle,
+                                contentDescription = "Create",
+                                tint = if (currentDestination == NavDestination.CREATE) Color(0xFFE85D75) else Color.White,
+                                modifier = Modifier.size(56.dp)
+                            )
+                        }
                     }
                 }
+
+                // Trends
+                NavItem(
+                    icon = Icons.Outlined.TrendingUp,
+                    label = "Trends",
+                    isSelected = currentDestination == NavDestination.TRENDS,
+                    onClick = { onNavigate(NavDestination.TRENDS) }
+                )
+
+                // Profile
+                NavItem(
+                    icon = Icons.Outlined.Person,
+                    label = "You",
+                    isSelected = currentDestination == NavDestination.PROFILE,
+                    onClick = { onNavigate(NavDestination.PROFILE) }
+                )
             }
-
-            // Trends
-            NavItem(
-                icon = Icons.Outlined.TrendingUp,
-                label = "Trends",
-                isSelected = currentDestination == NavDestination.TRENDS,
-                onClick = { onNavigate(NavDestination.TRENDS) }
-            )
-
-            // Profile
-            NavItem(
-                icon = Icons.Outlined.Person,
-                label = "You",
-                isSelected = currentDestination == NavDestination.PROFILE,
-                onClick = { onNavigate(NavDestination.PROFILE) }
-            )
         }
     }
 }

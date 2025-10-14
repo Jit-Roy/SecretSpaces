@@ -41,6 +41,7 @@ fun MainScreenContainer(
                 FeedScreen(
                     nearbySecrets = nearbySecrets,
                     isLoading = isLoading,
+                    currentUser = currentUser,
                     onSecretClick = onSecretClick,
                     onDropSecretClick = onDropSecretClick,
                     onProfileClick = { currentDestination = NavDestination.PROFILE },

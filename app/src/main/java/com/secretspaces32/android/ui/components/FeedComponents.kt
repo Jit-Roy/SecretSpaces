@@ -66,15 +66,17 @@ fun FeedSecretCard(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(CircleShape),
+                        .clip(CircleShape)
+                        .background(Color(0xFF1C1C1C))
+                        .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (secret.isAnonymous || secret.userProfilePicture.isNullOrEmpty()) {
                         Icon(
-                            imageVector = if (secret.isAnonymous) Icons.Default.Person else Icons.Default.AccountCircle,
+                            imageVector = Icons.Default.Person,
                             contentDescription = "Profile",
-                            tint = Color.White,
-                            modifier = Modifier.size(44.dp)
+                            tint = Color(0xFFFF4D4D),
+                            modifier = Modifier.size(26.dp)
                         )
                     } else {
                         AsyncImage(
