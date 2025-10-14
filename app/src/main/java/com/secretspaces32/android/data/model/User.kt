@@ -6,6 +6,8 @@ data class User(
     val username: String = "",
     val profilePictureUrl: String? = null,
     val bio: String = "",
+    val followersCount: Int = 0,
+    val followingCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 

@@ -223,32 +223,6 @@ fun SecretSpacesApp() {
             selectedScreen = Screen.Feed
         }
 
-        Screen.Profile -> {
-            // Load user's secrets when Profile screen is opened
-            LaunchedEffect(Unit) {
-                viewModel.loadMySecrets()
-            }
-
-            ProfileScreen(
-                user = uiState.currentUser,
-                mySecrets = uiState.mySecrets,
-                onSignOut = {
-                    viewModel.signOut()
-                    selectedScreen = Screen.Feed
-                },
-                onUpdateProfile = { username, bio, imageUri ->
-                    viewModel.updateProfile(username, bio, imageUri)
-                },
-                onMySecretsClick = {
-                    selectedScreen = Screen.MySecrets
-                },
-                onBackClick = {
-                    selectedScreen = Screen.Feed
-                },
-                isLoading = uiState.isLoading
-            )
-        }
-
         Screen.MySecrets -> {
             MySecretsScreen(
                 secrets = uiState.mySecrets,

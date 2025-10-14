@@ -1,18 +1,15 @@
 package com.secretspaces32.android.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -20,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class NavDestination {
-    HOME, MAP, CREATE, TRENDS, PROFILE
+    HOME, MAP, CREATE, TRENDS, PROFILE, SETTINGS
 }
 
 @Composable
@@ -95,7 +92,7 @@ fun BottomNavigationBar(
 
                 // Trends
                 NavItem(
-                    icon = Icons.Outlined.TrendingUp,
+                    icon = Icons.AutoMirrored.Outlined.TrendingUp,
                     label = "Trends",
                     isSelected = currentDestination == NavDestination.TRENDS,
                     onClick = { onNavigate(NavDestination.TRENDS) }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/app/src/main/java/com/secretspaces32/android/data/model/User.kt">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/app/src/main/java/com/secretspaces32/android/data/model/User.kt" />
+              <option name="originalContent" value="package com.secretspaces32.android.data.model&#10;&#10;data class User(&#10;    val id: String = &quot;&quot;,&#10;    val email: String = &quot;&quot;,&#10;    val username: String = &quot;&quot;,&#10;    val profilePictureUrl: String? = null,&#10;    val bio: String = &quot;&quot;,&#10;    val createdAt: Long = System.currentTimeMillis()&#10;)&#10;&#10;data class UpdateUserRequest(&#10;    val username: String? = null,&#10;    val bio: String? = null,&#10;    val profilePictureUrl: String? = null&#10;)&#10;" />
+              <option name="updatedContent" value="package com.secretspaces32.android.data.model&#13;&#10;&#13;&#10;data class User(&#13;&#10;    val id: String = &quot;&quot;,&#13;&#10;    val email: String = &quot;&quot;,&#13;&#10;    val username: String = &quot;&quot;,&#13;&#10;    val profilePictureUrl: String? = null,&#13;&#10;    val bio: String = &quot;&quot;,&#13;&#10;    val followersCount: Int = 0,&#13;&#10;    val followingCount: Int = 0,&#13;&#10;    val createdAt: Long = System.currentTimeMillis()&#13;&#10;)&#13;&#10;&#13;&#10;data class UpdateUserRequest(&#13;&#10;    val username: String? = null,&#13;&#10;    val bio: String? = null,&#13;&#10;    val profilePictureUrl: String? = null&#13;&#10;)" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

@@ -95,37 +95,63 @@ fun MainScreenContainer(
                     onMySecretsClick = {
                         // TODO: Navigate to MySecrets if needed
                     },
+                    onSettingsClick = {
+                        currentDestination = NavDestination.SETTINGS
+                    },
+                    onLikeClick = onLikeClick,
+                    onCommentClick = { secret ->
+                        // Handle comment click
+                    },
+                    onMapClick = { secret ->
+                        focusedSecret = secret
+                        currentDestination = NavDestination.MAP
+                    },
+                    onSecretClick = onSecretClick,
+                    isLoading = isLoading
+                )
+            }
+
+            NavDestination.SETTINGS -> {
+                SettingsScreen(
+                    user = currentUser,
+                    onSignOut = onSignOut,
+                    onUpdateProfile = onUpdateProfile,
                     onBackClick = {
-                        currentDestination = NavDestination.HOME
+                        currentDestination = NavDestination.PROFILE
                     },
                     isLoading = isLoading
                 )
             }
         }
 
-        // Bottom Navigation Bar - Always visible
-        BottomNavigationBar(
-            currentDestination = currentDestination,
-            onNavigate = { destination ->
-                when (destination) {
-                    NavDestination.HOME -> {
-                        currentDestination = NavDestination.HOME
+        // Bottom Navigation Bar - Always visible except on Settings screen
+        if (currentDestination != NavDestination.SETTINGS) {
+            BottomNavigationBar(
+                currentDestination = currentDestination,
+                onNavigate = { destination ->
+                    when (destination) {
+                        NavDestination.HOME -> {
+                            currentDestination = NavDestination.HOME
+                        }
+                        NavDestination.MAP -> {
+                            currentDestination = NavDestination.MAP
+                        }
+                        NavDestination.CREATE -> {
+                            currentDestination = NavDestination.CREATE
+                        }
+                        NavDestination.TRENDS -> {
+                            currentDestination = NavDestination.TRENDS
+                        }
+                        NavDestination.PROFILE -> {
+                            currentDestination = NavDestination.PROFILE
+                        }
+                        NavDestination.SETTINGS -> {
+                            currentDestination = NavDestination.SETTINGS
+                        }
                     }
-                    NavDestination.MAP -> {
-                        currentDestination = NavDestination.MAP
-                    }
-                    NavDestination.CREATE -> {
-                        currentDestination = NavDestination.CREATE
-                    }
-                    NavDestination.TRENDS -> {
-                        currentDestination = NavDestination.TRENDS
-                    }
-                    NavDestination.PROFILE -> {
-                        currentDestination = NavDestination.PROFILE
-                    }
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
     }
 }
