@@ -72,12 +72,40 @@ fun StoryViewerScreen(
             model = currentStory.imageUrl,
             contentDescription = "Story",
             modifier = Modifier
-                .fillMaxSize()
-                .clickable {
-                    // Tap right side to go next, left side to go previous
-                },
+                .fillMaxSize(),
             contentScale = ContentScale.Fit
         )
+
+        // Tap areas for navigation - MOVED BEFORE TOP UI to be behind it
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left side - previous story
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable {
+                        if (currentIndex > 0) {
+                            onPreviousStory()
+                        } else {
+                            onClose()
+                        }
+                    }
+            )
+
+            // Right side - next story
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable {
+                        if (currentIndex < stories.size - 1) {
+                            onNextStory()
+                        } else {
+                            onClose()
+                        }
+                    }
+            )
+        }
 
         // Gradient overlay for better text visibility
         Box(
@@ -94,7 +122,7 @@ fun StoryViewerScreen(
                 )
         )
 
-        // Top section with progress bars and close button
+        // Top section with progress bars and close button - ON TOP of tap areas
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -177,17 +205,23 @@ fun StoryViewerScreen(
                     }
                 }
 
-                // Close button
-                IconButton(
-                    onClick = onClose,
+                // Close button with explicit clickable to prevent tap-through
+                Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable {
+                            println("DEBUG: Close button clicked")
+                            onClose()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -215,37 +249,6 @@ fun StoryViewerScreen(
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
-        }
-
-        // Tap areas for navigation
-        Row(modifier = Modifier.fillMaxSize()) {
-            // Left side - previous story
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable {
-                        if (currentIndex > 0) {
-                            onPreviousStory()
-                        } else {
-                            onClose()
-                        }
-                    }
-            )
-
-            // Right side - next story
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable {
-                        if (currentIndex < stories.size - 1) {
-                            onNextStory()
-                        } else {
-                            onClose()
-                        }
-                    }
-            )
         }
     }
 }

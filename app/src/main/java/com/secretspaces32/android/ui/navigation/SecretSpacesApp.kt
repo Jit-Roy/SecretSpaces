@@ -80,6 +80,14 @@ fun SecretSpacesApp() {
         }
     }
 
+    // Auto-navigate to story viewer when stories are loaded
+    LaunchedEffect(uiState.selectedUserStories) {
+        if (uiState.selectedUserStories.isNotEmpty() && selectedScreen == Screen.Feed) {
+            println("DEBUG: Stories loaded (${uiState.selectedUserStories.size}), auto-navigating to viewer")
+            selectedScreen = Screen.StoryViewer
+        }
+    }
+
     // Show authentication screen if not authenticated
     if (!uiState.isAuthenticated) {
         AuthScreen(
@@ -221,13 +229,11 @@ fun SecretSpacesApp() {
                 cacheDir = context.cacheDir,
                 myStories = uiState.myStories,
                 onViewMyStory = {
-                    // Load current user's stories and navigate to story viewer
+                    // Load current user's stories - navigation will happen via LaunchedEffect below
                     println("DEBUG: onViewMyStory clicked")
                     uiState.currentUser?.id?.let { userId ->
                         println("DEBUG: Loading stories for user: $userId")
                         viewModel.loadUserStories(userId)
-                        println("DEBUG: Navigating to StoryViewer")
-                        selectedScreen = Screen.StoryViewer
                     } ?: run {
                         println("DEBUG: No current user found")
                     }
