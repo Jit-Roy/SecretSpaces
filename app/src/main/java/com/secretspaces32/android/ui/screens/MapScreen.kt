@@ -1,5 +1,6 @@
 package com.secretspaces32.android.ui.screens
 
+import android.Manifest
 import android.location.Location
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -20,12 +21,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.isGranted
 import com.google.gson.JsonPrimitive
 import com.secretspaces32.android.BuildConfig
 import com.secretspaces32.android.data.model.Secret
@@ -43,33 +48,83 @@ import org.maplibre.android.plugins.annotation.SymbolOptions
 // Define 3 states for the bottom sheet
 enum class SheetState { COLLAPSED, HALF_EXPANDED, FULLY_EXPANDED }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MapScreen(
     currentLocation: Location?,
     nearbySecrets: List<Secret>,
-    isLoading: Boolean,
     onSecretClick: (Secret) -> Unit,
-    onDropSecretClick: () -> Unit,
-    onProfileClick: () -> Unit,
-    onLikeClick: (Secret) -> Unit = {},
-    initialSheetState: String = "COLLAPSED",
-    onSheetStateChange: (String) -> Unit = {}
+    onSheetStateChange: (String) -> Unit = {},
+    onLocationPermissionGranted: () -> Unit = {}
 ) {
     var showSecretPreview by remember { mutableStateOf<Secret?>(null) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
 
+    // Location permissions state
+    val locationPermissions = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    )
+
+    // Update location when permission is granted
+    LaunchedEffect(locationPermissions.allPermissionsGranted) {
+        if (locationPermissions.allPermissionsGranted && currentLocation == null) {
+            onLocationPermissionGranted()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Map View
-        if (currentLocation != null) {
-            MapViewComposable(
-                currentLocation = currentLocation,
-                secrets = nearbySecrets,
-                onMarkerClick = { showSecretPreview = it },
-                focusedSecret = focusedSecret,
-                onFocusHandled = { focusedSecret = null }
-            )
+        // Map View - Only show if permissions are granted
+        if (locationPermissions.allPermissionsGranted) {
+            // Show map if we have location OR show loading if location is being fetched
+            if (currentLocation != null) {
+                MapViewComposable(
+                    currentLocation = currentLocation,
+                    secrets = nearbySecrets,
+                    onMarkerClick = { showSecretPreview = it },
+                    focusedSecret = focusedSecret,
+                    onFocusHandled = { focusedSecret = null }
+                )
+            } else {
+                // Permissions granted but location still loading
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(id = com.secretspaces32.android.R.drawable.map_placeholder),
+                        contentDescription = "Map Placeholder",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f))
+                    )
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = TealPrimary,
+                            modifier = Modifier.size(42.dp)
+                        )
+                        Text(
+                            text = "Getting your location...",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
         } else {
-            // Show map placeholder while loading location
+            // Show map placeholder with location permission request
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -86,29 +141,76 @@ fun MapScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.5f))
                 )
 
-                // Loading indicator
+                // Permission request UI
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(32.dp)
                 ) {
-                    CircularProgressIndicator(
-                        color = TealPrimary,
-                        modifier = Modifier.size(42.dp)
+                    // Map icon
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = TealPrimary,
+                        modifier = Modifier.size(80.dp)
                     )
+
                     Text(
-                        text = "Loading map...",
+                        text = "Enable Location",
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
+
                     Text(
-                        text = "Fetching your location",
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodySmall
+                        text = "To view nearby secrets on the map, we need access to your location.",
+                        color = Color.White.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Permission request button
+                    Button(
+                        onClick = {
+                            locationPermissions.launchMultiplePermissionRequest()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TealPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .height(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Allow Location Access",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    // Show different message if permission was denied
+                    if (locationPermissions.permissions.any { !it.status.isGranted } && !locationPermissions.allPermissionsGranted) {
+                        Text(
+                            text = "Location permission is required to show the map. Please grant permission in the dialog above.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp
+                        )
+                    }
                 }
             }
         }
@@ -295,6 +397,14 @@ fun MapViewComposable(
 
                                         mapLibreMap.setStyle(styleUrl) { style ->
                                             try {
+                                                // Set initial camera position to user's location
+                                                mapLibreMap.moveCamera(
+                                                    CameraUpdateFactory.newLatLngZoom(
+                                                        LatLng(currentLocation.latitude, currentLocation.longitude),
+                                                        14.0
+                                                    )
+                                                )
+
                                                 // Clean up old symbol manager
                                                 symbolManager?.onDestroy()
 

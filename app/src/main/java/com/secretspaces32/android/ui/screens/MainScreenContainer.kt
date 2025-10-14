@@ -22,7 +22,8 @@ fun MainScreenContainer(
     onSignOut: () -> Unit,
     onUpdateProfile: (String, String, android.net.Uri?) -> Unit,
     onLikeClick: (Secret) -> Unit = {},
-    onLoadMySecrets: () -> Unit = {}
+    onLoadMySecrets: () -> Unit = {},
+    onLocationPermissionGranted: () -> Unit = {}
 ) {
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
@@ -57,11 +58,8 @@ fun MainScreenContainer(
                 MapScreen(
                     currentLocation = currentLocation,
                     nearbySecrets = nearbySecrets,
-                    isLoading = isLoading,
                     onSecretClick = onSecretClick,
-                    onDropSecretClick = onDropSecretClick,
-                    onProfileClick = { currentDestination = NavDestination.PROFILE },
-                    onLikeClick = onLikeClick
+                    onLocationPermissionGranted = onLocationPermissionGranted
                 )
             }
 

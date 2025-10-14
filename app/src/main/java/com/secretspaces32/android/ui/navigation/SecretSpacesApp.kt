@@ -50,44 +50,18 @@ fun SecretSpacesApp() {
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember { CredentialManager.create(context) }
 
-    // Location permissions
-    val locationPermissions = rememberMultiplePermissionsState(
-        permissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    )
+    // Location permissions - removed automatic request
+    // Permissions will be requested from MapScreen when user navigates there
 
-    // Initialize location immediately when authenticated
+    // Initialize with default location when authenticated
     LaunchedEffect(uiState.isAuthenticated) {
         if (uiState.isAuthenticated) {
             try {
-                println("DEBUG: App authenticated, calling updateLocation")
-                // Call updateLocation immediately - it will use default location if no permission
+                println("DEBUG: App authenticated, initializing with default location")
+                // Call updateLocation - it will use default location if no permission
                 viewModel.updateLocation()
-
-                // Then request permissions for better accuracy
-                if (!locationPermissions.allPermissionsGranted) {
-                    println("DEBUG: Launching permission request")
-                    kotlinx.coroutines.delay(500) // Small delay to let UI settle
-                    locationPermissions.launchMultiplePermissionRequest()
-                }
             } catch (e: Exception) {
                 println("DEBUG: Error in authentication flow: ${e.message}")
-                e.printStackTrace()
-            }
-        }
-    }
-
-    // Update location when permissions are granted
-    LaunchedEffect(locationPermissions.allPermissionsGranted) {
-        if (locationPermissions.allPermissionsGranted && uiState.isAuthenticated) {
-            try {
-                println("DEBUG: Permissions granted, updating to real location")
-                kotlinx.coroutines.delay(300) // Small delay after permission grant
-                viewModel.updateLocation()
-            } catch (e: Exception) {
-                println("DEBUG: Error updating location: ${e.message}")
                 e.printStackTrace()
             }
         }
@@ -232,6 +206,9 @@ fun SecretSpacesApp() {
                 },
                 onLoadMySecrets = {
                     viewModel.loadMySecrets()
+                },
+                onLocationPermissionGranted = {
+                    viewModel.updateLocation()
                 }
             )
         }
