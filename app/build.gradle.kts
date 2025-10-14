@@ -27,6 +27,14 @@ android {
         val maptilerApiKey = properties.getProperty("MAPTILER_API_KEY") ?: ""
         buildConfigField("String", "MAPTILER_API_KEY", "\"$maptilerApiKey\"")
 
+        // Read Cloudinary credentials from local.properties
+        val cloudinaryCloudName = properties.getProperty("CLOUDINARY_CLOUD_NAME") ?: ""
+        val cloudinaryApiKey = properties.getProperty("CLOUDINARY_API_KEY") ?: ""
+        val cloudinaryApiSecret = properties.getProperty("CLOUDINARY_API_SECRET") ?: ""
+        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"$cloudinaryCloudName\"")
+        buildConfigField("String", "CLOUDINARY_API_KEY", "\"$cloudinaryApiKey\"")
+        buildConfigField("String", "CLOUDINARY_API_SECRET", "\"$cloudinaryApiSecret\"")
+
         // Add native library options for 16 KB page size support
         ndk {
             //noinspection ChromeOsAbiSupport

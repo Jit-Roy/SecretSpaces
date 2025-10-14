@@ -6,6 +6,7 @@ import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
 import com.google.firebase.auth.FirebaseAuth
+import com.secretspaces32.android.BuildConfig
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -19,9 +20,10 @@ class CloudinaryStorageManager(private val context: Context) {
     private val auth = FirebaseAuth.getInstance()
 
     companion object {
-        private const val CLOUD_NAME = "dt9lrjzm3"
-        private const val API_KEY = "383797572254455"
-        private const val API_SECRET = "yAo7e4IdM9PB7QlBIPOgDoUdeJk"
+        // Read credentials from BuildConfig (stored in local.properties)
+        private val CLOUD_NAME = BuildConfig.CLOUDINARY_CLOUD_NAME
+        private val API_KEY = BuildConfig.CLOUDINARY_API_KEY
+        private val API_SECRET = BuildConfig.CLOUDINARY_API_SECRET
 
         // Folder paths in Cloudinary
         private const val PROFILE_PICTURES_FOLDER = "secret_spaces/profile_pictures"
