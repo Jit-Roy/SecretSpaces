@@ -136,7 +136,7 @@ fun FeedScreen(
             ) {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(start = 36.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(stories) { story ->
@@ -286,9 +286,9 @@ fun StoryItem(
             // Story Ring
             Box(
                 modifier = Modifier
-                    .size(66.dp)
+                    .size(48.dp)
                     .border(
-                        width = 2.5.dp,
+                        width = 2.dp,
                         brush = if (story.hasUnseenStory) {
                             Brush.linearGradient(
                                 colors = listOf(
@@ -312,9 +312,10 @@ fun StoryItem(
             // Profile Picture
             Box(
                 modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .background(DarkSurface),
+                    .size(44.dp)
+                    .background(Color(0xFF1C1C1C), shape = CircleShape)
+                    .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
+                    .clip(CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 if (story.profilePicture != null) {
@@ -326,10 +327,10 @@ fun StoryItem(
                     )
                 } else {
                     Icon(
-                        imageVector = if (story.isYourStory) Icons.Default.AccountCircle else Icons.Default.Person,
+                        imageVector = Icons.Default.Person,
                         contentDescription = story.username,
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(36.dp)
+                        tint = Color(0xFFFF4D4D),
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -338,9 +339,9 @@ fun StoryItem(
             if (story.isYourStory) {
                 Box(
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(18.dp)
                         .align(Alignment.BottomEnd)
-                        .offset(x = (-2).dp, y = (-2).dp)
+                        .offset(x = (-1).dp, y = (-1).dp)
                         .clip(CircleShape)
                         .background(TealPrimary)
                         .border(2.dp, DarkBackground, CircleShape),
@@ -350,7 +351,7 @@ fun StoryItem(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Add Story",
                         tint = Color.White,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }

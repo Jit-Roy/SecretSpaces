@@ -1,6 +1,7 @@
 package com.secretspaces32.android.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -46,12 +47,13 @@ fun TrendsScreen(
                 onClick = onProfileClick,
                 modifier = Modifier
                     .size(42.dp)
-                    .background(DarkSurface.copy(alpha = 0.9f), CircleShape)
+                    .background(Color(0xFF1C1C1C), CircleShape)
+                    .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
             ) {
                 Icon(
-                    imageVector = Icons.Default.AccountCircle,
+                    imageVector = Icons.Default.Person,
                     contentDescription = "Profile",
-                    tint = TealPrimary,
+                    tint = Color(0xFFFF4D4D),
                     modifier = Modifier.size(26.dp)
                 )
             }

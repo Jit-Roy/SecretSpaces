@@ -17,7 +17,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Gif
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -167,13 +167,31 @@ fun DropSecretScreen(
                                 .padding(horizontal = 20.dp, vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // User icon
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "User Icon",
-                                tint = Color(0xFFFF4D4D),
-                                modifier = Modifier.size(40.dp)
-                            )
+                            // User icon with circle background and outline
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFFFF4D4D).copy(alpha = 0.15f), shape = CircleShape)
+                                    .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (user.profilePictureUrl != null) {
+                                    AsyncImage(
+                                        model = user.profilePictureUrl,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "User Icon",
+                                        tint = Color(0xFFFF4D4D),
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                            }
 
                             Spacer(modifier = Modifier.width(12.dp))
 
