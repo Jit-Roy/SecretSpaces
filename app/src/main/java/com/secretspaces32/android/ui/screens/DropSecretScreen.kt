@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
@@ -119,18 +118,10 @@ fun DropSecretScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(16.dp),
+                            .padding(start = 36.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color(0xFFFF4D4D)
-                            )
-                        }
-
                         Text(
                             text = "Drop a Secret",
                             style = MaterialTheme.typography.headlineMedium,
@@ -204,13 +195,17 @@ fun DropSecretScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 100.dp), // Add padding for bottom button
+                    .padding(bottom = 180.dp), // Increased padding to account for navigation bar + selector
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 // Secret text input with media buttons - no Surface wrapper
                 Column(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = DarkSurface.copy(alpha = 0.15f),
+                        )
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
                     OutlinedTextField(
                         value = secretText,
@@ -339,13 +334,12 @@ fun DropSecretScreen(
             }
         }
 
-        // Bottom Story/Secret selector - Fixed at bottom like navigation bar
+        // Bottom Story/Secret selector - Fixed at bottom above navigation bar
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 80.dp, vertical = 16.dp)
+                .padding(horizontal = 80.dp, vertical = 110.dp) // Increased to shift buttons higher
         ) {
             // Pill-shaped container with red outline
             Row(

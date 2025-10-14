@@ -23,7 +23,9 @@ fun MainScreenContainer(
     onUpdateProfile: (String, String, android.net.Uri?) -> Unit,
     onLikeClick: (Secret) -> Unit = {},
     onLoadMySecrets: () -> Unit = {},
-    onLocationPermissionGranted: () -> Unit = {}
+    onLocationPermissionGranted: () -> Unit = {},
+    onPostSecret: ((String, android.net.Uri?, Boolean, String?, String?, String?) -> Unit)? = null,
+    cacheDir: java.io.File? = null
 ) {
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
@@ -44,7 +46,7 @@ fun MainScreenContainer(
                     isLoading = isLoading,
                     currentUser = currentUser,
                     onSecretClick = onSecretClick,
-                    onDropSecretClick = onDropSecretClick,
+                    onDropSecretClick = { currentDestination = NavDestination.CREATE },
                     onProfileClick = { currentDestination = NavDestination.PROFILE },
                     onLikeClick = onLikeClick,
                     onMapClick = { secret ->
@@ -64,8 +66,18 @@ fun MainScreenContainer(
             }
 
             NavDestination.CREATE -> {
-                // This is handled by navigation to DropSecretScreen
-                // So this case should never be reached as we navigate away
+                DropSecretScreen(
+                    isLoading = isLoading,
+                    onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
+                        onPostSecret?.invoke(text, imageUri, isAnonymous, mood, category, hashtags)
+                        currentDestination = NavDestination.HOME
+                    },
+                    onBack = {
+                        currentDestination = NavDestination.HOME
+                    },
+                    cacheDir = cacheDir,
+                    currentUser = currentUser
+                )
             }
 
             NavDestination.TRENDS -> {
@@ -103,7 +115,7 @@ fun MainScreenContainer(
                         currentDestination = NavDestination.MAP
                     }
                     NavDestination.CREATE -> {
-                        onDropSecretClick()
+                        currentDestination = NavDestination.CREATE
                     }
                     NavDestination.TRENDS -> {
                         currentDestination = NavDestination.TRENDS

@@ -209,23 +209,18 @@ fun SecretSpacesApp() {
                 },
                 onLocationPermissionGranted = {
                     viewModel.updateLocation()
-                }
+                },
+                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
+                    viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
+                },
+                cacheDir = context.cacheDir
             )
         }
 
         Screen.DropSecret -> {
-            DropSecretScreen(
-                isLoading = uiState.isLoading,
-                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags ->
-                    viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
-                    selectedScreen = Screen.Feed
-                },
-                onBack = {
-                    selectedScreen = Screen.Feed
-                },
-                cacheDir = context.cacheDir,
-                currentUser = uiState.currentUser
-            )
+            // This case is now handled within MainScreenContainer
+            // Redirect to Feed
+            selectedScreen = Screen.Feed
         }
 
         Screen.Profile -> {
