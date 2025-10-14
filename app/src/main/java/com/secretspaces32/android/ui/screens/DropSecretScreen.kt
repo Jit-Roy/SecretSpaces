@@ -123,7 +123,7 @@ fun DropSecretScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Drop a Secret",
+                            text = "Drop",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -195,13 +195,20 @@ fun DropSecretScreen(
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                            // User name
-                            Text(
-                                text = user.username.ifEmpty { "Anonymous" },
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            // User name and prompt text
+                            Column {
+                                Text(
+                                    text = user.username.ifEmpty { "Anonymous" },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "What's on your mind?",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
                         }
                     }
                 }
@@ -233,7 +240,7 @@ fun DropSecretScreen(
                             .heightIn(min = 200.dp),
                         placeholder = {
                             Text(
-                                text = "What's on your mind?",
+                                text = if (selectedPostType == "Secret") "Drop your secret" else "Drop your story",
                                 color = Color.White.copy(alpha = 0.5f),
                                 fontFamily = FontFamily.Default
                             )
