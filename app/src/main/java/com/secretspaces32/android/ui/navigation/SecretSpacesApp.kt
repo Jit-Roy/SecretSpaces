@@ -223,7 +223,8 @@ fun SecretSpacesApp() {
                 onBack = {
                     selectedScreen = Screen.Feed
                 },
-                cacheDir = context.cacheDir
+                cacheDir = context.cacheDir,
+                currentUser = uiState.currentUser
             )
         }
 
