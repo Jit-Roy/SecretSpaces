@@ -58,7 +58,8 @@ fun FeedScreen(
     onNotificationsClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onStoryClick: (Story) -> Unit = {},
-    onAddStoryClick: () -> Unit = {}
+    onAddStoryClick: () -> Unit = {},
+    onUserProfileClick: (String) -> Unit = {} // Add callback for viewing user profiles
 ) {
     val lazyListState = rememberLazyListState()
 
@@ -238,7 +239,8 @@ fun FeedScreen(
                                 onLikeClick = { onLikeClick(it) },
                                 onCommentClick = { onSecretClick(it) },
                                 onMapClick = { onMapClick(it) },
-                                onCardClick = { onSecretClick(it) }
+                                onCardClick = { onSecretClick(it) },
+                                onProfileClick = { userId -> onUserProfileClick(userId) }
                             )
                         }
 

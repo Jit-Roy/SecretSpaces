@@ -1,11 +1,13 @@
 package com.secretspaces32.android.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -177,14 +179,16 @@ fun StoryViewerScreen(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color.Gray),
+                                .background(Color(0xFFFF4D4D).copy(alpha = 0.15f), shape = CircleShape)
+                                .border(2.dp, Color(0xFFFF4D4D), CircleShape)
+                                .clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = currentStory.username.firstOrNull()?.toString()?.uppercase() ?: "?",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = Color(0xFFFF4D4D),
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -233,6 +237,7 @@ fun StoryViewerScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .navigationBarsPadding() // Automatically adjust for system navigation bar
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(

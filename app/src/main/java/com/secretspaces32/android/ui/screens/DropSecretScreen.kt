@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.CameraAlt
@@ -27,9 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.secretspaces32.android.data.model.User
 import com.secretspaces32.android.ui.theme.DarkBackground
@@ -100,12 +99,11 @@ fun DropSecretScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground) // Changed to proper black
+            .background(DarkBackground)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
         ) {
             // Top Bar
             Surface(
@@ -118,16 +116,36 @@ fun DropSecretScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(start = 36.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
+                            .padding(start = 4.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Drop",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        // Back arrow and Drop text together
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Text(
+                                text = "Drop",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
 
                         // Drop button in header
                         IconButton(
@@ -216,11 +234,12 @@ fun DropSecretScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Main Content
+            // Main Content - scrollable area
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 180.dp), // Increased padding to account for navigation bar + selector
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 // Secret text input with media buttons - no Surface wrapper
@@ -354,17 +373,17 @@ fun DropSecretScreen(
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
 
-        // Bottom Story/Secret selector - Fixed at bottom above navigation bar
+        // Bottom Story/Secret selector - Fixed at bottom with proper spacing
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 80.dp, vertical = 110.dp) // Increased to shift buttons higher
+                .navigationBarsPadding() // Only account for system navigation bar
+                .padding(horizontal = 80.dp, vertical = 16.dp)
         ) {
             // Pill-shaped container with red outline
             Row(
@@ -404,7 +423,7 @@ fun DropSecretScreen(
                     )
                 }
 
-                // Vertical white divider
+                // Vertical divider
                 Box(
                     modifier = Modifier
                         .width(1.dp)

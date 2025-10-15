@@ -40,7 +40,8 @@ fun FeedSecretCard(
     onLikeClick: (Secret) -> Unit,
     onCommentClick: (Secret) -> Unit,
     onMapClick: (Secret) -> Unit,
-    onCardClick: (Secret) -> Unit
+    onCardClick: (Secret) -> Unit,
+    onProfileClick: (String) -> Unit = {} // Add callback for profile clicks
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val maxLines = if (isExpanded) Int.MAX_VALUE else 4
@@ -68,7 +69,13 @@ fun FeedSecretCard(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF1C1C1C))
-                        .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape),
+                        .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
+                        .clickable(enabled = !secret.isAnonymous) {
+                            // Navigate to user profile if not anonymous
+                            if (!secret.isAnonymous) {
+                                onProfileClick(secret.userId)
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (secret.isAnonymous || secret.userProfilePicture.isNullOrEmpty()) {

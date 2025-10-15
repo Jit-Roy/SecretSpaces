@@ -35,7 +35,12 @@ data class AppUiState(
     val errorMessage: String? = null,
     val myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
     val selectedUserStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
-    val currentStoryIndex: Int = 0
+    val currentStoryIndex: Int = 0,
+    val selectedUser: User? = null,
+    val selectedUserSecrets: List<Secret> = emptyList(),
+    val isFollowing: Boolean = false,
+    val isFriend: Boolean = false,
+    val friendRequestSent: Boolean = false
 )
 
 class MainViewModel(
@@ -563,5 +568,79 @@ class MainViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    // Profile Viewer functions
+    fun loadUserProfile(userId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            // Load user profile
+            val userResult = userRepository.getUser(userId)
+            userResult.onSuccess { user ->
+                _uiState.value = _uiState.value.copy(selectedUser = user)
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Failed to load user profile: ${e.message}"
+                )
+            }
+
+            // Load user's secrets
+            val secretsResult = secretRepository.getUserSecrets(userId)
+            secretsResult.onSuccess { secrets ->
+                _uiState.value = _uiState.value.copy(
+                    selectedUserSecrets = secrets,
+                    isLoading = false
+                )
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to load user posts: ${e.message}"
+                )
+            }
+
+            // TODO: Load follow/friend status when backend supports it
+            // For now, set to default values
+            _uiState.value = _uiState.value.copy(
+                isFollowing = false,
+                isFriend = false,
+                friendRequestSent = false
+            )
+        }
+    }
+
+    fun clearSelectedUser() {
+        _uiState.value = _uiState.value.copy(
+            selectedUser = null,
+            selectedUserSecrets = emptyList(),
+            isFollowing = false,
+            isFriend = false,
+            friendRequestSent = false
+        )
+    }
+
+    fun toggleFollow() {
+        viewModelScope.launch {
+            // TODO: Implement follow/unfollow when backend supports it
+            val currentlyFollowing = _uiState.value.isFollowing
+            _uiState.value = _uiState.value.copy(isFollowing = !currentlyFollowing)
+
+            // Show feedback
+            _uiState.value = _uiState.value.copy(
+                errorMessage = if (!currentlyFollowing) "Following user" else "Unfollowed user"
+            )
+        }
+    }
+
+    fun sendFriendRequest() {
+        viewModelScope.launch {
+            // TODO: Implement friend request when backend supports it
+            _uiState.value = _uiState.value.copy(friendRequestSent = true)
+
+            // Show feedback
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "Friend request sent"
+            )
+        }
     }
 }

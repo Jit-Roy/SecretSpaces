@@ -28,7 +28,8 @@ fun MainScreenContainer(
     cacheDir: java.io.File? = null,
     myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
     onViewMyStory: () -> Unit = {},
-    onLoadMyStories: () -> Unit = {}
+    onLoadMyStories: () -> Unit = {},
+    onUserProfileClick: (String) -> Unit = {} // New parameter for viewing user profiles
 ) {
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
@@ -73,6 +74,10 @@ fun MainScreenContainer(
                             println("DEBUG: Calling onViewMyStory")
                             onViewMyStory()
                         }
+                    },
+                    onUserProfileClick = { userId ->
+                        // Navigate to the user's profile
+                        onUserProfileClick(userId)
                     }
                 )
             }
@@ -146,7 +151,7 @@ fun MainScreenContainer(
         }
 
         // Bottom Navigation Bar - Always visible except on Settings screen
-        if (currentDestination != NavDestination.SETTINGS) {
+        if (currentDestination != NavDestination.SETTINGS && currentDestination != NavDestination.CREATE) {
             BottomNavigationBar(
                 currentDestination = currentDestination,
                 onNavigate = { destination ->

@@ -26,7 +26,8 @@ enum class Screen {
     Profile,
     MySecrets,
     SecretDetail,
-    StoryViewer
+    StoryViewer,
+    ProfileViewer
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -240,6 +241,10 @@ fun SecretSpacesApp() {
                 },
                 onLoadMyStories = {
                     viewModel.loadMyStories()
+                },
+                onUserProfileClick = { userId ->
+                    viewModel.loadUserProfile(userId)
+                    selectedScreen = Screen.ProfileViewer
                 }
             )
         }
@@ -296,6 +301,44 @@ fun SecretSpacesApp() {
                     viewModel.clearSelectedStories()
                     selectedScreen = Screen.Feed
                 }
+            )
+        }
+
+        Screen.ProfileViewer -> {
+            ProfileViewerScreen(
+                user = uiState.selectedUser,
+                currentUserId = uiState.currentUser?.id,
+                userSecrets = uiState.selectedUserSecrets,
+                isFollowing = uiState.isFollowing,
+                isFriend = uiState.isFriend,
+                friendRequestSent = uiState.friendRequestSent,
+                onBack = {
+                    viewModel.clearSelectedUser()
+                    selectedScreen = Screen.Feed
+                },
+                onFollowClick = {
+                    viewModel.toggleFollow()
+                },
+                onSendFriendRequest = {
+                    viewModel.sendFriendRequest()
+                },
+                onLikeClick = { secret ->
+                    viewModel.toggleLike(secret)
+                },
+                onCommentClick = { secret ->
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.SecretDetail
+                },
+                onMapClick = { secret ->
+                    // Navigate to map with selected secret
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.Map
+                },
+                onSecretClick = { secret ->
+                    viewModel.selectSecret(secret)
+                    selectedScreen = Screen.SecretDetail
+                },
+                isLoading = uiState.isLoading
             )
         }
 
