@@ -262,27 +262,30 @@ fun StoryViewerScreen(
             }
         }
 
-        // Caption at bottom
-        currentStory.caption?.let { caption ->
+        // Caption at bottom - Show for IMAGE stories with captions
+        if (currentStory.imageUrl != null && !currentStory.caption.isNullOrBlank()) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .navigationBarsPadding() // Automatically adjust for system navigation bar
+                    .navigationBarsPadding()
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.7f)
+                                Color.Black.copy(alpha = 0.8f)
                             )
                         )
                     )
-                    .padding(16.dp)
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                contentAlignment = Alignment.Center  // Center the text inside the box
             ) {
                 Text(
-                    text = caption,
+                    text = currentStory.caption,
                     color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center  // Center align the text
                 )
             }
         }
