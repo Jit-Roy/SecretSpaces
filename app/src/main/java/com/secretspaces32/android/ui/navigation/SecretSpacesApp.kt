@@ -245,6 +245,9 @@ fun SecretSpacesApp() {
                 onUserProfileClick = { userId ->
                     viewModel.loadUserProfile(userId)
                     selectedScreen = Screen.ProfileViewer
+                },
+                onCreateStory = { imageUri, text ->
+                    viewModel.createStory(imageUri, text)
                 }
             )
         }

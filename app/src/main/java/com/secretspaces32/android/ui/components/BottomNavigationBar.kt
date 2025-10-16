@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class NavDestination {
-    HOME, MAP, CREATE, TRENDS, PROFILE, SETTINGS
+    HOME, MAP, CREATE, TRENDS, PROFILE, SETTINGS, CREATE_STORY
 }
 
 @Composable

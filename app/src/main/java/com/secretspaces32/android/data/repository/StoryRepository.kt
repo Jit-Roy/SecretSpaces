@@ -24,25 +24,29 @@ class StoryRepository(context: Context) {
     }
 
     /**
-     * Create a new story with image
+     * Create a new story with optional image (supports text-only stories)
      */
     suspend fun createStory(
-        imageUri: Uri,
+        imageUri: Uri?,
         caption: String?,
         username: String,
         userProfilePicture: String?
     ): Result<Story> {
         return try {
-            val userId = auth.currentUser?.uid 
+            val userId = auth.currentUser?.uid
                 ?: return Result.failure(Exception("Not authenticated"))
 
-            // Upload story image using centralized storage manager
-            val imageUrl = storageManager.uploadStoryImage(imageUri).getOrNull()
-                ?: return Result.failure(Exception("Failed to upload story image"))
+            // Upload story image only if provided
+            val imageUrl = if (imageUri != null) {
+                storageManager.uploadStoryImage(imageUri).getOrNull()
+                    ?: return Result.failure(Exception("Failed to upload story image"))
+            } else {
+                null // Text-only story
+            }
 
             val storyId = UUID.randomUUID().toString()
             val timestamp = System.currentTimeMillis()
-            
+
             val story = Story(
                 id = storyId,
                 userId = userId,
@@ -69,7 +73,7 @@ class StoryRepository(context: Context) {
     suspend fun getActiveStories(followingUserIds: List<String>): Result<Map<String, List<Story>>> {
         return try {
             val currentTime = System.currentTimeMillis()
-            
+
             if (followingUserIds.isEmpty()) {
                 return Result.success(emptyMap())
             }
@@ -226,7 +230,7 @@ class StoryRepository(context: Context) {
                 .await()
 
             // Optionally delete the image from storage
-            if (story.imageUrl.isNotEmpty()) {
+            if (!story.imageUrl.isNullOrEmpty()) {
                 storageManager.deleteImage(story.imageUrl)
             }
 
@@ -236,9 +240,6 @@ class StoryRepository(context: Context) {
         }
     }
 
-    /**
-     * Clean up expired stories (should be called periodically)
-     */
     suspend fun cleanupExpiredStories(): Result<Int> {
         return try {
             val currentTime = System.currentTimeMillis()
@@ -256,7 +257,7 @@ class StoryRepository(context: Context) {
 
                 // Optionally delete images from storage
                 document.toObject(Story::class.java)?.let { story ->
-                    if (story.imageUrl.isNotEmpty()) {
+                    if (!story.imageUrl.isNullOrEmpty()) {
                         storageManager.deleteImage(story.imageUrl)
                     }
                 }

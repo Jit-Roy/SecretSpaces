@@ -353,8 +353,9 @@ class MainViewModel(
                 return@launch
             }
 
-            if (imageUri == null) {
-                _uiState.value = _uiState.value.copy(errorMessage = "Story requires an image")
+            // Allow stories without images - text-only stories are now supported
+            if (imageUri == null && caption.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Story requires either an image or text")
                 return@launch
             }
 

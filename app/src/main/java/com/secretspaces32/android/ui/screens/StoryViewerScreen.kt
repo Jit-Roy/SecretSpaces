@@ -69,14 +69,45 @@ fun StoryViewerScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Story Image - Full screen
-        AsyncImage(
-            model = currentStory.imageUrl,
-            contentDescription = "Story",
-            modifier = Modifier
-                .fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
+        // Story content - Image or Text-only with colored background
+        if (currentStory.imageUrl != null) {
+            // Image Story - Full screen
+            AsyncImage(
+                model = currentStory.imageUrl,
+                contentDescription = "Story",
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            // Text-only Story with colored background
+            val backgroundColors = listOf(
+                Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53))),
+                Brush.linearGradient(listOf(Color(0xFF4E54C8), Color(0xFF8F94FB))),
+                Brush.linearGradient(listOf(Color(0xFF11998E), Color(0xFF38EF7D))),
+                Brush.linearGradient(listOf(Color(0xFFFA8BFF), Color(0xFF2BD2FF))),
+                Brush.linearGradient(listOf(Color(0xFFF093FB), Color(0xFFF5576C))),
+                Brush.linearGradient(listOf(Color(0xFF4776E6), Color(0xFF8E54E9)))
+            )
+            val selectedBackground = backgroundColors[currentStory.id.hashCode().mod(backgroundColors.size)]
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(selectedBackground),
+                contentAlignment = Alignment.Center
+            ) {
+                currentStory.caption?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(32.dp)
+                    )
+                }
+            }
+        }
 
         // Tap areas for navigation - MOVED BEFORE TOP UI to be behind it
         Row(modifier = Modifier.fillMaxSize()) {

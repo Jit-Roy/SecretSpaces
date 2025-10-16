@@ -144,9 +144,13 @@ fun FeedScreen(
                         StoryItem(
                             story = story,
                             onClick = {
-                                // Always call onStoryClick for viewing stories
+                                // Click on profile icon - view stories
                                 onStoryClick(story)
-                            }
+                            },
+                            onAddClick = if (story.isYourStory) {
+                                // Click on + icon - create new story
+                                { onAddStoryClick() }
+                            } else null
                         )
                     }
                 }
@@ -270,22 +274,21 @@ fun FeedScreen(
 @Composable
 fun StoryItem(
     story: Story,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onAddClick: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .width(70.dp)
-            .clickable(onClick = onClick)
+        modifier = Modifier.width(70.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center
         ) {
-            // Story Ring
+            // Story Ring with larger size for Your Story
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(if (story.isYourStory) 64.dp else 48.dp)
                     .border(
                         width = 2.dp,
                         brush = if (story.hasUnseenStory) {
@@ -308,13 +311,14 @@ fun StoryItem(
                     )
             )
 
-            // Profile Picture
+            // Profile Picture - clickable to view stories
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(if (story.isYourStory) 60.dp else 44.dp)
                     .background(Color(0xFF1C1C1C), shape = CircleShape)
                     .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center
             ) {
                 if (story.profilePicture != null) {
@@ -329,28 +333,29 @@ fun StoryItem(
                         imageVector = Icons.Default.Person,
                         contentDescription = story.username,
                         tint = Color(0xFFFF4D4D),
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(if (story.isYourStory) 32.dp else 26.dp)
                     )
                 }
             }
 
-            // Add icon for "Your Story"
-            if (story.isYourStory) {
+            // Add icon for "Your Story" - clickable separately
+            if (story.isYourStory && onAddClick != null) {
                 Box(
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(22.dp)
                         .align(Alignment.BottomEnd)
-                        .offset(x = (-1).dp, y = (-1).dp)
+                        .offset(x = (-2).dp, y = (-2).dp)
                         .clip(CircleShape)
                         .background(TealPrimary)
-                        .border(2.dp, DarkBackground, CircleShape),
+                        .border(2.dp, DarkBackground, CircleShape)
+                        .clickable(onClick = onAddClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Add Story",
                         tint = Color.White,
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

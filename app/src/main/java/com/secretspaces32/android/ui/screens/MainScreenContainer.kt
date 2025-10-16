@@ -29,7 +29,8 @@ fun MainScreenContainer(
     myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
     onViewMyStory: () -> Unit = {},
     onLoadMyStories: () -> Unit = {},
-    onUserProfileClick: (String) -> Unit = {} // New parameter for viewing user profiles
+    onUserProfileClick: (String) -> Unit = {},
+    onCreateStory: (android.net.Uri?, String) -> Unit = { _, _ -> } // New parameter for creating stories
 ) {
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
@@ -63,8 +64,8 @@ fun MainScreenContainer(
                         currentDestination = NavDestination.MAP
                     },
                     onAddStoryClick = {
-                        // Navigate to create story
-                        currentDestination = NavDestination.CREATE
+                        // Navigate to create story screen
+                        currentDestination = NavDestination.CREATE_STORY
                     },
                     onStoryClick = { story ->
                         println("DEBUG: onStoryClick called for story: ${story.username}, isYourStory: ${story.isYourStory}")
@@ -103,6 +104,20 @@ fun MainScreenContainer(
                     },
                     cacheDir = cacheDir,
                     currentUser = currentUser
+                )
+            }
+
+            NavDestination.CREATE_STORY -> {
+                CreateStoryScreen(
+                    isLoading = isLoading,
+                    onCreateStory = { imageUri, text ->
+                        onCreateStory(imageUri, text)
+                        currentDestination = NavDestination.HOME
+                    },
+                    onBack = {
+                        currentDestination = NavDestination.HOME
+                    },
+                    cacheDir = cacheDir
                 )
             }
 
@@ -150,8 +165,10 @@ fun MainScreenContainer(
             }
         }
 
-        // Bottom Navigation Bar - Always visible except on Settings screen
-        if (currentDestination != NavDestination.SETTINGS && currentDestination != NavDestination.CREATE) {
+        // Bottom Navigation Bar - Always visible except on Settings, Create, and Create Story screens
+        if (currentDestination != NavDestination.SETTINGS &&
+            currentDestination != NavDestination.CREATE &&
+            currentDestination != NavDestination.CREATE_STORY) {
             BottomNavigationBar(
                 currentDestination = currentDestination,
                 onNavigate = { destination ->
@@ -164,6 +181,9 @@ fun MainScreenContainer(
                         }
                         NavDestination.CREATE -> {
                             currentDestination = NavDestination.CREATE
+                        }
+                        NavDestination.CREATE_STORY -> {
+                            currentDestination = NavDestination.CREATE_STORY
                         }
                         NavDestination.TRENDS -> {
                             currentDestination = NavDestination.TRENDS

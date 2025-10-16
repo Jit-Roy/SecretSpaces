@@ -5,7 +5,7 @@ data class Story(
     val userId: String = "",
     val username: String = "",
     val userProfilePicture: String? = null,
-    val imageUrl: String = "",
+    val imageUrl: String? = null,
     val caption: String? = null,
     val timestamp: Long = 0,
     val expiresAt: Long = 0, // 24 hours from creation
@@ -20,4 +20,3 @@ data class StoryView(
     val username: String = "",
     val timestamp: Long = 0
 )
-
