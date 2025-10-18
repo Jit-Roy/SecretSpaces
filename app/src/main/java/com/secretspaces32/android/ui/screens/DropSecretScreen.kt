@@ -1,23 +1,26 @@
 package com.secretspaces32.android.ui.screens
 
+import android.content.ContentUris
+import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Gif
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,50 +29,74 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.secretspaces32.android.data.model.User
 import com.secretspaces32.android.ui.theme.DarkBackground
 import com.secretspaces32.android.ui.theme.DarkSurface
 import java.io.File
 
+data class GalleryImage(
+    val uri: Uri,
+    val id: Long
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropSecretScreen(
     isLoading: Boolean,
-    onPostSecret: (String, Uri?, Boolean, String?, String?, String?, String) -> Unit,
+    onNext: (List<Uri>) -> Unit,
     onBack: () -> Unit = {},
     cacheDir: File? = null,
     currentUser: User? = null
 ) {
-    var secretText by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedPostType by remember { mutableStateOf("Secret") } // "Secret" or "Story"
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var galleryImages by remember { mutableStateOf<List<GalleryImage>>(emptyList()) }
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var hasGalleryPermission by remember { mutableStateOf(false) }
 
-    // Image picker launcher
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        selectedImageUri = uri
+    // Gallery permission launcher
+    val galleryPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasGalleryPermission = isGranted
+        if (isGranted) {
+            galleryImages = loadGalleryImages(context)
+        }
     }
 
-    // GIF picker launcher
-    val gifPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        selectedImageUri = uri
+    // Check and request permission on launch
+    LaunchedEffect(Unit) {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        hasGalleryPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (hasGalleryPermission) {
+            galleryImages = loadGalleryImages(context)
+        } else {
+            galleryPermissionLauncher.launch(permission)
+        }
     }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (!success) {
-            // If photo was not taken, clear the URI
-            selectedImageUri = null
+        if (success) {
+            // Image was captured, refresh gallery
+            galleryImages = loadGalleryImages(context)
         }
     }
 
@@ -90,7 +117,6 @@ fun DropSecretScreen(
                     "com.secretspaces32.android.fileprovider",
                     photoFile
                 )
-                selectedImageUri = photoUri
                 cameraLauncher.launch(photoUri)
             }
         }
@@ -102,8 +128,7 @@ fun DropSecretScreen(
             .background(DarkBackground)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         ) {
             // Top Bar
             Surface(
@@ -111,347 +136,313 @@ fun DropSecretScreen(
                 color = DarkBackground,
                 shadowElevation = 4.dp
             ) {
-                Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 4.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Back arrow and New post text
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(start = 4.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
                     ) {
-                        // Back arrow and Drop text together
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.size(40.dp)
                         ) {
-                            IconButton(
-                                onClick = onBack,
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Text(
-                                text = "Drop",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 
-                        // Drop button in header
-                        IconButton(
-                            onClick = {
-                                if (secretText.isNotBlank()) {
-                                    onPostSecret(secretText, selectedImageUri, false, null, null, null, selectedPostType)
-                                }
-                            },
-                            enabled = secretText.isNotBlank() && !isLoading
-                        ) {
-                            if (isLoading && secretText.isNotBlank()) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = Color(0xFFFF4D4D),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Drop Secret",
-                                    tint = if (secretText.isNotBlank()) Color(0xFFFF4D4D) else Color.White
-                                )
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = "New post",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
 
-                    HorizontalDivider(
-                        color = Color.White,
-                        thickness = 1.dp
-                    )
-
-                    // Profile Section
-                    currentUser?.let { user ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // User icon with circle background and outline
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .background(Color(0xFFFF4D4D).copy(alpha = 0.15f), shape = CircleShape)
-                                    .border(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.3f), CircleShape)
-                                    .clip(CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (user.profilePictureUrl != null) {
-                                    AsyncImage(
-                                        model = user.profilePictureUrl,
-                                        contentDescription = "Profile",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "User Icon",
-                                        tint = Color(0xFFFF4D4D),
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
+                    // Next button
+                    TextButton(
+                        onClick = {
+                            if (selectedImageUris.isNotEmpty()) {
+                                onNext(selectedImageUris)
                             }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // User name and prompt text
-                            Column {
-                                Text(
-                                    text = user.username.ifEmpty { "Anonymous" },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "What's on your mind?",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.6f)
-                                )
-                            }
-                        }
+                        },
+                        enabled = selectedImageUris.isNotEmpty() && !isLoading
+                    ) {
+                        Text(
+                            text = "Next",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedImageUris.isNotEmpty()) Color(0xFF4D9FFF) else Color.White.copy(alpha = 0.5f)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Main Content - Image Preview
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.6f)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selectedImageUris.isNotEmpty()) {
+                    AsyncImage(
+                        model = selectedImageUris.first(),
+                        contentDescription = "Selected image preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
 
-            // Main Content - scrollable area
+                    // Image counter if multiple selected
+                    if (selectedImageUris.size > 1) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.Black.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "1/${selectedImageUris.size}",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Select photos",
+                        color = Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+            }
+
+            // Bottom Gallery Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .weight(0.4f)
+                    .background(DarkBackground)
             ) {
-                // Secret text input with media buttons - no Surface wrapper
-                Column(
+                // Recents header with SELECT MULTIPLE button
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            color = DarkSurface.copy(alpha = 0.15f),
-                        )
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = secretText,
-                        onValueChange = { secretText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 200.dp),
-                        placeholder = {
-                            Text(
-                                text = if (selectedPostType == "Secret") "Drop your secret" else "Drop your story",
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontFamily = FontFamily.Default
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = Color(0xFFFF4D4D),
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        ),
-                        textStyle = LocalTextStyle.current.copy(
-                            fontFamily = FontFamily.Default
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        maxLines = 15
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Character count and media buttons on same line
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${secretText.length}/500 characters",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.5f)
+                            text = "Recents",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Dropdown",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .padding(start = 4.dp)
+                        )
+                    }
 
-                        // Media buttons row
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Image picker button
-                            IconButton(
-                                onClick = { imagePickerLauncher.launch("image/*") },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Image,
-                                    contentDescription = "Add Image",
-                                    tint = Color(0xFFFF4D4D),
-                                    modifier = Modifier.size(20.dp)
-                                )
+                    Surface(
+                        onClick = {
+                            isMultiSelectMode = !isMultiSelectMode
+                            if (!isMultiSelectMode) {
+                                // Keep only first selected image when exiting multi-select
+                                selectedImageUris = selectedImageUris.take(1)
                             }
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isMultiSelectMode) Color(0xFF4D9FFF) else Color.Transparent,
+                        border = if (!isMultiSelectMode) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "SELECT MULTIPLE",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
 
-                            // Camera button
-                            IconButton(
-                                onClick = {
+                // Gallery Grid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    // Camera item (first item)
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .background(Color(0xFF1C1C1E))
+                                .clickable {
                                     cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                                 },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Take Photo",
+                                tint = Color.White,
                                 modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CameraAlt,
-                                    contentDescription = "Take Photo",
-                                    tint = Color(0xFFFF4D4D),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            // GIF picker button
-                            IconButton(
-                                onClick = { gifPickerLauncher.launch("image/gif") },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Gif,
-                                    contentDescription = "Add GIF",
-                                    tint = Color(0xFFFF4D4D),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            )
                         }
                     }
 
-                    // Display selected media
-                    selectedImageUri?.let { uri ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Box {
+                    // Gallery images
+                    items(galleryImages) { image ->
+                        val isSelected = selectedImageUris.contains(image.uri)
+                        val selectionNumber = if (isSelected) selectedImageUris.indexOf(image.uri) + 1 else 0
+
+                        Box(
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .clickable {
+                                    if (isMultiSelectMode) {
+                                        selectedImageUris = if (isSelected) {
+                                            selectedImageUris.filter { it != image.uri }
+                                        } else {
+                                            selectedImageUris + image.uri
+                                        }
+                                    } else {
+                                        selectedImageUris = listOf(image.uri)
+                                    }
+                                }
+                        ) {
                             AsyncImage(
-                                model = uri,
-                                contentDescription = "Selected media",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 200.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
+                                model = image.uri,
+                                contentDescription = "Gallery image",
+                                modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                            Surface(
-                                onClick = { selectedImageUri = null },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp),
-                                shape = CircleShape,
-                                color = Color(0xFFFF4D4D)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove media",
-                                    tint = Color.White,
-                                    modifier = Modifier.padding(8.dp)
+
+                            // Selection overlay
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0xFF4D9FFF).copy(alpha = 0.3f))
                                 )
+
+                                // Selection number
+                                if (isMultiSelectMode) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(24.dp),
+                                        shape = CircleShape,
+                                        color = Color(0xFF4D9FFF)
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = selectionNumber.toString(),
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Selected",
+                                        tint = Color(0xFF4D9FFF),
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(24.dp)
+                                    )
+                                }
+                            } else if (isMultiSelectMode) {
+                                // Show empty circle in multi-select mode
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(24.dp),
+                                    shape = CircleShape,
+                                    color = Color.Transparent,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                                ) {}
                             }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(80.dp))
-            }
-        }
-
-        // Bottom Story/Secret selector - Fixed at bottom with proper spacing
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding() // Only account for system navigation bar
-                .padding(horizontal = 80.dp, vertical = 16.dp)
-        ) {
-            // Pill-shaped container with red outline
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .background(
-                        color = Color.Black,
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .border(
-                        width = 2.dp,
-                        color = Color(0xFFFF4D4D),
-                        shape = RoundedCornerShape(24.dp)
-                    ),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Secret button
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(
-                            color = if (selectedPostType == "Secret") Color(0xFFFF4D4D) else Color.Transparent,
-                            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
-                        )
-                        .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp))
-                        .clickable { selectedPostType = "Secret" }
-                ) {
-                    Text(
-                        text = "Secret",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                // Vertical divider
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight()
-                        .background(Color(0xFFFF4D4D))
-                )
-
-                // Story button
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(
-                            color = if (selectedPostType == "Story") Color(0xFFFF4D4D) else Color.Transparent,
-                            shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
-                        )
-                        .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-                        .clickable { selectedPostType = "Story" }
-                ) {
-                    Text(
-                        text = "Story",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
                 }
             }
         }
     }
+}
+
+private fun loadGalleryImages(context: Context): List<GalleryImage> {
+    val images = mutableListOf<GalleryImage>()
+    val projection = arrayOf(
+        MediaStore.Images.Media._ID,
+        MediaStore.Images.Media.DATE_ADDED
+    )
+
+    val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+    context.contentResolver.query(
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        projection,
+        null,
+        null,
+        sortOrder
+    )?.use { cursor ->
+        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+
+        while (cursor.moveToNext() && images.size < 100) { // Limit to 100 recent images
+            val id = cursor.getLong(idColumn)
+            val contentUri = ContentUris.withAppendedId(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                id
+            )
+            images.add(GalleryImage(contentUri, id))
+        }
+    }
+
+    return images
 }

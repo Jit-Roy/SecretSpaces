@@ -112,6 +112,7 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
+
     // MapLibre for maps (using MapTiler)
     implementation("org.maplibre.gl:android-sdk:11.5.2")
     implementation("org.maplibre.gl:android-plugin-annotation-v9:3.0.2")

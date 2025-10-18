@@ -6,9 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -59,9 +61,13 @@ fun FeedScreen(
     onMessagesClick: () -> Unit = {},
     onStoryClick: (Story) -> Unit = {},
     onAddStoryClick: () -> Unit = {},
-    onUserProfileClick: (String) -> Unit = {} // Add callback for viewing user profiles
+    onUserProfileClick: (String) -> Unit = {}, // Add callback for viewing user profiles
+    scrollState: LazyListState? = null // Accept scroll state from parent
 ) {
-    val lazyListState = rememberLazyListState()
+    // Use provided scroll state or create a new one (fallback for when not provided)
+    val lazyListState = scrollState ?: rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     // Build stories list: "Your Story" + friends' stories
     val stories = remember(currentUser, friendsWithStories) {

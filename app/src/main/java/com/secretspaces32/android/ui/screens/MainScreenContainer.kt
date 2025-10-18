@@ -3,6 +3,8 @@ package com.secretspaces32.android.ui.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.secretspaces32.android.data.model.Secret
@@ -30,10 +32,17 @@ fun MainScreenContainer(
     onViewMyStory: () -> Unit = {},
     onLoadMyStories: () -> Unit = {},
     onUserProfileClick: (String) -> Unit = {},
-    onCreateStory: (android.net.Uri?, String) -> Unit = { _, _ -> } // New parameter for creating stories
+    onCreateStory: (android.net.Uri?, String) -> Unit = { _, _ -> },
+    feedScrollState: LazyListState? = null // Accept from parent
 ) {
-    var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
+    var currentDestination by rememberSaveable { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
+    var selectedImages by rememberSaveable { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+
+    // Use provided scroll state or create fallback (but parent should always provide it now)
+    val actualFeedScrollState = feedScrollState ?: rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     // Load user secrets when profile is accessed
     LaunchedEffect(currentDestination) {
@@ -79,7 +88,8 @@ fun MainScreenContainer(
                     onUserProfileClick = { userId ->
                         // Navigate to the user's profile
                         onUserProfileClick(userId)
-                    }
+                    },
+                    scrollState = actualFeedScrollState // Pass the scroll state to FeedScreen
                 )
             }
 
@@ -95,14 +105,46 @@ fun MainScreenContainer(
             NavDestination.CREATE -> {
                 DropSecretScreen(
                     isLoading = isLoading,
-                    onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags, postType ->
-                        onPostSecret?.invoke(text, imageUri, isAnonymous, mood, category, hashtags, postType)
-                        currentDestination = NavDestination.HOME
+                    onNext = { imageUris ->
+                        selectedImages = imageUris
+                        currentDestination = NavDestination.CROP_IMAGES
                     },
                     onBack = {
                         currentDestination = NavDestination.HOME
                     },
                     cacheDir = cacheDir,
+                    currentUser = currentUser
+                )
+            }
+
+            NavDestination.CROP_IMAGES -> {
+                ImageCropScreen(
+                    selectedImages = selectedImages,
+                    onImagesCropped = { croppedUris ->
+                        selectedImages = croppedUris
+                        currentDestination = NavDestination.ADD_DESCRIPTION
+                    },
+                    onBack = {
+                        currentDestination = NavDestination.CREATE
+                    },
+                    cacheDir = cacheDir
+                )
+            }
+
+            NavDestination.ADD_DESCRIPTION -> {
+                AddDescriptionScreen(
+                    selectedImages = selectedImages,
+                    isLoading = isLoading,
+                    onPostSecret = { text, imageUris ->
+                        // Post the first image with the text (keeping backward compatibility)
+                        // You may want to update your backend to support multiple images
+                        onPostSecret?.invoke(text, imageUris.firstOrNull(), false, null, null, null, "Secret")
+                        selectedImages = emptyList()
+                        currentDestination = NavDestination.HOME
+                    },
+                    onBack = {
+                        currentDestination = NavDestination.CROP_IMAGES
+                    },
                     currentUser = currentUser
                 )
             }
@@ -165,9 +207,11 @@ fun MainScreenContainer(
             }
         }
 
-        // Bottom Navigation Bar - Always visible except on Settings, Create, and Create Story screens
+        // Bottom Navigation Bar - Always visible except on Settings, Create, Crop Images, Add Description, and Create Story screens
         if (currentDestination != NavDestination.SETTINGS &&
             currentDestination != NavDestination.CREATE &&
+            currentDestination != NavDestination.CROP_IMAGES &&
+            currentDestination != NavDestination.ADD_DESCRIPTION &&
             currentDestination != NavDestination.CREATE_STORY) {
             BottomNavigationBar(
                 currentDestination = currentDestination,
@@ -193,6 +237,9 @@ fun MainScreenContainer(
                         }
                         NavDestination.SETTINGS -> {
                             currentDestination = NavDestination.SETTINGS
+                        }
+                        NavDestination.ADD_DESCRIPTION, NavDestination.CROP_IMAGES -> {
+                            // Don't allow direct navigation to ADD_DESCRIPTION or CROP_IMAGES
                         }
                     }
                 },

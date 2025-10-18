@@ -2,6 +2,7 @@ package com.secretspaces32.android.ui.navigation
 
 import android.Manifest
 import android.widget.Toast
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
@@ -44,7 +45,12 @@ fun SecretSpacesApp() {
     )
 
     val uiState by viewModel.uiState.collectAsState()
-    var selectedScreen by remember { mutableStateOf(Screen.Feed) }
+    var selectedScreen by rememberSaveable { mutableStateOf(Screen.Feed) }
+
+    // Hoist feed scroll state to top level so it survives navigation to SecretDetail and back
+    val feedScrollState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     // Persist the sheet state at navigation level so it survives screen changes
     var mapSheetState by rememberSaveable { mutableStateOf("COLLAPSED") }
@@ -248,7 +254,8 @@ fun SecretSpacesApp() {
                 },
                 onCreateStory = { imageUri, text ->
                     viewModel.createStory(imageUri, text)
-                }
+                },
+                feedScrollState = feedScrollState // Pass the feed scroll state down
             )
         }
 
