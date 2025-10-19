@@ -344,6 +344,56 @@ class MainViewModel(
         }
     }
 
+    // New function to create secret with multiple images
+    fun createSecretWithMultipleImages(
+        text: String,
+        imageUris: List<Uri>,
+        isAnonymous: Boolean,
+        mood: String? = null,
+        category: String? = null,
+        hashtags: String? = null
+    ) {
+        viewModelScope.launch {
+            val location = _uiState.value.currentLocation
+            val user = _uiState.value.currentUser
+
+            if (location == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Location not available")
+                return@launch
+            }
+
+            if (user == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "User not authenticated")
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            val result = secretRepository.createSecretWithMultipleImages(
+                text = text,
+                imageUris = imageUris,
+                latitude = location.latitude,
+                longitude = location.longitude,
+                username = user.username,
+                userProfilePicture = user.profilePictureUrl,
+                isAnonymous = isAnonymous,
+                mood = mood,
+                category = category,
+                hashtags = hashtags
+            )
+
+            result.onSuccess {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                fetchNearbySecrets(location.latitude, location.longitude)
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to post secret: ${e.message}"
+                )
+            }
+        }
+    }
+
     fun createStory(imageUri: Uri?, caption: String?) {
         viewModelScope.launch {
             val user = _uiState.value.currentUser

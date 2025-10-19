@@ -68,6 +68,59 @@ class SecretRepository(context: Context) {
         }
     }
 
+    // New function to support multiple images
+    suspend fun createSecretWithMultipleImages(
+        text: String,
+        imageUris: List<Uri>,
+        latitude: Double,
+        longitude: Double,
+        username: String,
+        userProfilePicture: String?,
+        isAnonymous: Boolean,
+        mood: String? = null,
+        category: String? = null,
+        hashtags: String? = null
+    ): Result<Secret> {
+        return try {
+            val userId = auth.currentUser?.uid ?: return Result.failure(Exception("Not authenticated"))
+
+            val secretId = UUID.randomUUID().toString()
+
+            // Upload all images
+            val imageUrls = mutableListOf<String>()
+            imageUris.forEachIndexed { index, uri ->
+                val uploadResult = storageManager.uploadPostImage(uri, "${secretId}_$index")
+                uploadResult.getOrNull()?.let { url ->
+                    imageUrls.add(url)
+                }
+            }
+
+            val secret = Secret(
+                id = secretId,
+                text = text,
+                imageUrl = imageUrls.firstOrNull(), // Keep first image for backward compatibility
+                imageUrls = imageUrls.takeIf { it.isNotEmpty() }, // Store all images
+                latitude = latitude,
+                longitude = longitude,
+                timestamp = System.currentTimeMillis(),
+                userId = userId,
+                username = if (isAnonymous) "Anonymous" else username,
+                userProfilePicture = if (isAnonymous) null else userProfilePicture,
+                isAnonymous = isAnonymous,
+                likeCount = 0,
+                commentCount = 0,
+                mood = mood,
+                category = category,
+                hashtags = hashtags
+            )
+
+            secretsCollection.document(secretId).set(secret).await()
+            Result.success(secret)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getNearbySecrets(
         latitude: Double,
         longitude: Double,

@@ -323,6 +323,7 @@ fun CropView(
                                 if (isDraggingEdge && draggedEdge != null) {
                                     val touch = event.changes.first().position
                                     val deltaX = touch.x - initialTouchPoint.x
+                                    val deltaY = touch.y - initialTouchPoint.y
 
                                     val imageWidth = bitmap.width.toFloat()
                                     val imageHeight = bitmap.height.toFloat()
@@ -341,27 +342,104 @@ fun CropView(
                                     }
 
                                     val imageLeft = (canvasWidth - displayWidth) / 2f
+                                    val imageTop = (canvasHeight - displayHeight) / 2f
+                                    val imageRight = imageLeft + displayWidth
+                                    val imageBottom = imageTop + displayHeight
 
-                                    // Calculate new scale and offset based on dragged edge
-                                    when (draggedEdge) {
-                                        "right", "bottom-right", "top-right" -> {
-                                            // Dragging right edge - increase width
-                                            val newWidth = (canvasWidth * initialCropScale) + deltaX
-                                            val newScale = (newWidth / canvasWidth).coerceIn(0.3f, 1.0f)
-                                            currentCropFrameScale = newScale
+                                    // Dynamic scale constraints so the crop stays inside the displayed image
+                                    val maxScaleByWidth = displayWidth / canvasWidth
+                                    val maxScaleByHeight = (displayHeight * 16f / 9f) / canvasWidth
+                                    val maxAllowedScale = minOf(maxScaleByWidth, maxScaleByHeight)
+                                    val minAllowedScale = 0.2f // allow a smaller box than before
+
+                                    val initialWidth = canvasWidth * initialCropScale
+                                    val initialHeight = initialWidth * 9f / 16f
+                                    val initialRight = initialCropOffsetX + if (initialCropOffsetX == 0f && initialCropOffsetY == 0f) {
+                                        // If not positioned yet, treat as centered
+                                        (canvasWidth - initialWidth) / 2f + initialWidth
+                                    } else {
+                                        initialWidth
+                                    }
+
+                                    // Helper: clamp offsets to keep frame inside image
+                                    fun clampOffsets(width: Float, height: Float, proposedLeft: Float, proposedTop: Float): Pair<Float, Float> {
+                                        val minX = imageLeft
+                                        val maxX = imageRight - width
+                                        val minY = imageTop
+                                        val maxY = imageBottom - height
+                                        return proposedLeft.coerceIn(minX, maxX) to proposedTop.coerceIn(minY, maxY)
+                                    }
+
+                                    fun applyResize(newWidth: Float, anchorLeft: Boolean, anchorTop: Boolean) {
+                                        var width = newWidth.coerceAtLeast(1f)
+                                        var newScale = (width / canvasWidth).coerceIn(minAllowedScale, maxAllowedScale)
+                                        width = canvasWidth * newScale
+                                        val height = width * 9f / 16f
+
+                                        // Determine new left/top based on anchors
+                                        var left = if (anchorLeft) currentCropOffsetX else (currentCropOffsetX + cropWidth) - width
+                                        var top = if (anchorTop) currentCropOffsetY else (currentCropOffsetY + cropHeight) - height
+
+                                        // If offsets are zero (initial centered state), compute centered pos first
+                                        if (currentCropOffsetX == 0f && currentCropOffsetY == 0f) {
+                                            val centeredLeft = (canvasWidth - cropWidth) / 2f
+                                            val centeredTop = (canvasHeight - cropHeight) / 2f
+                                            left = if (anchorLeft) centeredLeft else (centeredLeft + cropWidth) - width
+                                            top = if (anchorTop) centeredTop else (centeredTop + cropHeight) - height
                                         }
-                                        "left", "bottom-left", "top-left" -> {
-                                            // Dragging left edge - increase width and move left
-                                            val newWidth = (canvasWidth * initialCropScale) - deltaX
-                                            val newScale = (newWidth / canvasWidth).coerceIn(0.3f, 1.0f)
 
-                                            // Adjust position to keep right edge fixed
-                                            val widthChange = (newScale - initialCropScale) * canvasWidth
-                                            currentCropOffsetX = (initialCropOffsetX - widthChange).coerceIn(
-                                                imageLeft,
-                                                imageLeft + displayWidth - canvasWidth * newScale
-                                            )
-                                            currentCropFrameScale = newScale
+                                        val (clampedLeft, clampedTop) = clampOffsets(width, height, left, top)
+
+                                        currentCropFrameScale = newScale
+                                        currentCropOffsetX = clampedLeft
+                                        currentCropOffsetY = clampedTop
+                                    }
+
+                                    when (draggedEdge) {
+                                        // Horizontal edges
+                                        "right" -> {
+                                            val newWidth = (canvasWidth * initialCropScale) + deltaX
+                                            applyResize(newWidth = newWidth, anchorLeft = true, anchorTop = true)
+                                        }
+                                        "left" -> {
+                                            val newWidth = (canvasWidth * initialCropScale) - deltaX
+                                            applyResize(newWidth = newWidth, anchorLeft = false, anchorTop = true)
+                                        }
+                                        // Vertical edges
+                                        "bottom" -> {
+                                            val newHeight = (initialHeight) + deltaY
+                                            val newWidth = newHeight * 16f / 9f
+                                            applyResize(newWidth = newWidth, anchorLeft = true, anchorTop = true)
+                                        }
+                                        "top" -> {
+                                            val newHeight = (initialHeight) - deltaY
+                                            val newWidth = newHeight * 16f / 9f
+                                            applyResize(newWidth = newWidth, anchorLeft = true, anchorTop = false)
+                                        }
+                                        // Corners
+                                        "bottom-right" -> {
+                                            val widthFromX = (canvasWidth * initialCropScale) + deltaX
+                                            val widthFromY = ((initialHeight + deltaY) * 16f / 9f)
+                                            val newWidth = if (kotlin.math.abs(widthFromX - initialWidth) >= kotlin.math.abs(widthFromY - initialWidth)) widthFromX else widthFromY
+                                            applyResize(newWidth = newWidth, anchorLeft = true, anchorTop = true)
+                                        }
+                                        "bottom-left" -> {
+                                            val widthFromX = (canvasWidth * initialCropScale) - deltaX
+                                            val widthFromY = ((initialHeight + deltaY) * 16f / 9f)
+                                            val newWidth = if (kotlin.math.abs(widthFromX - initialWidth) >= kotlin.math.abs(widthFromY - initialWidth)) widthFromX else widthFromY
+                                            applyResize(newWidth = newWidth, anchorLeft = false, anchorTop = true)
+                                        }
+                                        "top-right" -> {
+                                            val widthFromX = (canvasWidth * initialCropScale) + deltaX
+                                            val widthFromY = ((initialHeight - deltaY) * 16f / 9f)
+                                            val newWidth = if (kotlin.math.abs(widthFromX - initialWidth) >= kotlin.math.abs(widthFromY - initialWidth)) widthFromX else widthFromY
+                                            applyResize(newWidth = newWidth, anchorLeft = true, anchorTop = false)
+                                        }
+                                        "top-left" -> {
+                                            val widthFromX = (canvasWidth * initialCropScale) - deltaX
+                                            val widthFromY = ((initialHeight - deltaY) * 16f / 9f)
+                                            val newWidth = if (kotlin.math.abs(widthFromX - initialWidth) >= kotlin.math.abs(widthFromY - initialWidth)) widthFromX else widthFromY
+                                            applyResize(newWidth = newWidth, anchorLeft = false, anchorTop = false)
                                         }
                                     }
 

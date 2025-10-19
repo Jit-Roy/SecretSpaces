@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,10 +43,21 @@ fun FeedSecretCard(
     onCommentClick: (Secret) -> Unit,
     onMapClick: (Secret) -> Unit,
     onCardClick: (Secret) -> Unit,
-    onProfileClick: (String) -> Unit = {} // Add callback for profile clicks
+    onProfileClick: (String) -> Unit = {}, // Add callback for profile clicks
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> } // Add callback for image clicks
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val maxLines = if (isExpanded) Int.MAX_VALUE else 4
+
+    // Get all images (support both old and new format)
+    val allImages = remember(secret) {
+        val images = mutableListOf<String>()
+        secret.imageUrls?.let { images.addAll(it) }
+        if (images.isEmpty() && secret.imageUrl != null) {
+            images.add(secret.imageUrl)
+        }
+        images
+    }
 
     Column(
         modifier = Modifier
@@ -236,34 +249,120 @@ fun FeedSecretCard(
             }
         }
 
-        // Optional: Image if present
-        secret.imageUrl?.let { imageUrl ->
+        // Images Section - Support multiple images with carousel
+        if (allImages.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .height(300.dp)
             ) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "Secret image",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                // Gradient overlay for better visibility
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.3f)
-                                )
-                            )
+                if (allImages.size == 1) {
+                    // Single image
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onImageClick(allImages, 0) }
+                    ) {
+                        AsyncImage(
+                            model = allImages[0],
+                            contentDescription = "Secret image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
-                )
+                        // Gradient overlay for better visibility
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.3f)
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                } else {
+                    // Multiple images - Show carousel
+                    val pagerState = rememberPagerState(pageCount = { allImages.size })
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .clickable { onImageClick(allImages, page) }
+                            ) {
+                                AsyncImage(
+                                    model = allImages[page],
+                                    contentDescription = "Secret image ${page + 1}",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Gradient overlay
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.3f)
+                                                )
+                                            )
+                                        )
+                                )
+                            }
+                        }
+
+                        // Page counter at top-right
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.Black.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "${pagerState.currentPage + 1}/${allImages.size}",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Page indicators (dots) at bottom
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            repeat(allImages.size) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(
+                                            color = if (index == pagerState.currentPage)
+                                                Color.White
+                                            else
+                                                Color.White.copy(alpha = 0.4f),
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

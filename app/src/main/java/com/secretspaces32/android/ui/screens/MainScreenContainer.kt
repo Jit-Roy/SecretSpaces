@@ -26,13 +26,14 @@ fun MainScreenContainer(
     onLikeClick: (Secret) -> Unit = {},
     onLoadMySecrets: () -> Unit = {},
     onLocationPermissionGranted: () -> Unit = {},
-    onPostSecret: ((String, android.net.Uri?, Boolean, String?, String?, String?, String) -> Unit)? = null,
+    onPostSecret: ((String, List<android.net.Uri>, Boolean, String?, String?, String?, String) -> Unit)? = null,
     cacheDir: java.io.File? = null,
     myStories: List<com.secretspaces32.android.data.model.Story> = emptyList(),
     onViewMyStory: () -> Unit = {},
     onLoadMyStories: () -> Unit = {},
     onUserProfileClick: (String) -> Unit = {},
     onCreateStory: (android.net.Uri?, String) -> Unit = { _, _ -> },
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }, // Add image click callback
     feedScrollState: LazyListState? = null // Accept from parent
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.HOME) }
@@ -89,6 +90,7 @@ fun MainScreenContainer(
                         // Navigate to the user's profile
                         onUserProfileClick(userId)
                     },
+                    onImageClick = onImageClick, // Pass through image click callback
                     scrollState = actualFeedScrollState // Pass the scroll state to FeedScreen
                 )
             }
@@ -136,9 +138,8 @@ fun MainScreenContainer(
                     selectedImages = selectedImages,
                     isLoading = isLoading,
                     onPostSecret = { text, imageUris ->
-                        // Post the first image with the text (keeping backward compatibility)
-                        // You may want to update your backend to support multiple images
-                        onPostSecret?.invoke(text, imageUris.firstOrNull(), false, null, null, null, "Secret")
+                        // Post all selected images
+                        onPostSecret?.invoke(text, imageUris, false, null, null, null, "Secret")
                         selectedImages = emptyList()
                         currentDestination = NavDestination.HOME
                     },

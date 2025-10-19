@@ -62,6 +62,7 @@ fun FeedScreen(
     onStoryClick: (Story) -> Unit = {},
     onAddStoryClick: () -> Unit = {},
     onUserProfileClick: (String) -> Unit = {}, // Add callback for viewing user profiles
+    onImageClick: (List<String>, Int) -> Unit = { _, _ -> }, // Add callback for image viewer
     scrollState: LazyListState? = null // Accept scroll state from parent
 ) {
     // Use provided scroll state or create a new one (fallback for when not provided)
@@ -250,7 +251,8 @@ fun FeedScreen(
                                 onCommentClick = { onSecretClick(it) },
                                 onMapClick = { onMapClick(it) },
                                 onCardClick = { onSecretClick(it) },
-                                onProfileClick = { userId -> onUserProfileClick(userId) }
+                                onProfileClick = { userId -> onUserProfileClick(userId) },
+                                onImageClick = { imageUrls, initialIndex -> onImageClick(imageUrls, initialIndex) } // Pass image click handler
                             )
                         }
 

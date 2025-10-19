@@ -28,7 +28,8 @@ enum class Screen {
     MySecrets,
     SecretDetail,
     StoryViewer,
-    ProfileViewer
+    ProfileViewer,
+    ImageViewer
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -51,6 +52,10 @@ fun SecretSpacesApp() {
     val feedScrollState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
+
+    // Image viewer state
+    var imageViewerUrls by remember { mutableStateOf<List<String>>(emptyList()) }
+    var imageViewerInitialPage by remember { mutableStateOf(0) }
 
     // Persist the sheet state at navigation level so it survives screen changes
     var mapSheetState by rememberSaveable { mutableStateOf("COLLAPSED") }
@@ -226,11 +231,17 @@ fun SecretSpacesApp() {
                 onLocationPermissionGranted = {
                     viewModel.updateLocation()
                 },
-                onPostSecret = { text, imageUri, isAnonymous, mood, category, hashtags, postType ->
+                onPostSecret = { text, imageUris, isAnonymous, mood, category, hashtags, postType ->
                     if (postType == "Story") {
-                        viewModel.createStory(imageUri, text)
+                        // Stories still use single image
+                        viewModel.createStory(imageUris.firstOrNull(), text)
                     } else {
-                        viewModel.createSecret(text, imageUri, isAnonymous, mood, category, hashtags)
+                        // Secrets now support multiple images
+                        if (imageUris.isNotEmpty()) {
+                            viewModel.createSecretWithMultipleImages(text, imageUris, isAnonymous, mood, category, hashtags)
+                        } else {
+                            viewModel.createSecret(text, null, isAnonymous, mood, category, hashtags)
+                        }
                     }
                 },
                 cacheDir = context.cacheDir,
@@ -254,6 +265,12 @@ fun SecretSpacesApp() {
                 },
                 onCreateStory = { imageUri, text ->
                     viewModel.createStory(imageUri, text)
+                },
+                onImageClick = { imageUrls, initialPage ->
+                    // Navigate to image viewer
+                    imageViewerUrls = imageUrls
+                    imageViewerInitialPage = initialPage
+                    selectedScreen = Screen.ImageViewer
                 },
                 feedScrollState = feedScrollState // Pass the feed scroll state down
             )
@@ -349,6 +366,16 @@ fun SecretSpacesApp() {
                     selectedScreen = Screen.SecretDetail
                 },
                 isLoading = uiState.isLoading
+            )
+        }
+
+        Screen.ImageViewer -> {
+            ImageViewerScreen(
+                imageUrls = imageViewerUrls,
+                initialPage = imageViewerInitialPage,
+                onBack = {
+                    selectedScreen = Screen.Feed
+                }
             )
         }
 

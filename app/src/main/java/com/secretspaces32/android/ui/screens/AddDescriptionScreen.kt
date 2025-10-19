@@ -4,8 +4,8 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +37,10 @@ fun AddDescriptionScreen(
     currentUser: User? = null
 ) {
     var secretText by remember { mutableStateOf("") }
+    val pagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { selectedImages.size }
+    )
 
     Box(
         modifier = Modifier
@@ -111,33 +115,28 @@ fun AddDescriptionScreen(
                 }
             }
 
-            // Selected Images Preview - Large and centered with horizontal scroll
+            // Selected Images Preview - Large and centered with horizontal pager
             if (selectedImages.isNotEmpty()) {
-                LazyRow(
+                HorizontalPager(
+                    state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    items(selectedImages) { uri ->
-                        Box(
+                        .weight(1f)
+                ) { page ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = selectedImages[page],
+                            contentDescription = "Selected image",
                             modifier = Modifier
-                                .fillParentMaxHeight()
-                                .fillParentMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = uri,
-                                contentDescription = "Selected image",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(12.dp)),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit
+                        )
                     }
                 }
 
@@ -155,7 +154,7 @@ fun AddDescriptionScreen(
                                     .size(8.dp)
                                     .padding(horizontal = 2.dp)
                                     .background(
-                                        color = if (index == 0) Color.White else Color.White.copy(alpha = 0.3f),
+                                        color = if (index == pagerState.currentPage) Color.White else Color.White.copy(alpha = 0.3f),
                                         shape = CircleShape
                                     )
                             )

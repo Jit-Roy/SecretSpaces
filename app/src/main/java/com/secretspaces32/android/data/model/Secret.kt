@@ -3,7 +3,8 @@ package com.secretspaces32.android.data.model
 data class Secret(
     val id: String = "",
     val text: String = "",
-    val imageUrl: String? = null,
+    val imageUrl: String? = null, // Keep for backward compatibility
+    val imageUrls: List<String>? = null, // Support multiple images
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
     val timestamp: Long = System.currentTimeMillis(),
@@ -23,6 +24,7 @@ data class Secret(
 data class CreateSecretRequest(
     val text: String,
     val imageBase64: String?,
+    val imageBase64List: List<String>?, // Support multiple images
     val latitude: Double,
     val longitude: Double,
     val timestamp: Long,
