@@ -3,6 +3,7 @@ package com.secretspaces32.android.ui.screens
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -87,7 +88,7 @@ fun ImageCropScreen(
             coroutineScope.launch {
                 isSaving = true
                 val croppedUri = withContext(Dispatchers.IO) {
-                    cropBitmapToLandscape(bitmap, imageScale, cropFrameScale, cropFrameOffsetX, cropFrameOffsetY, cacheDir, context)
+                    cropBitmapToLandscape(bitmap, imageScale, cropFrameScale, cropFrameOffsetX, cropFrameOffsetY, rotationAngle, isFlippedHorizontally, cacheDir, context)
                 }
 
                 croppedUri?.let {
@@ -987,6 +988,8 @@ private fun cropBitmapToLandscape(
     cropFrameScale: Float,
     cropFrameOffsetX: Float,
     cropFrameOffsetY: Float,
+    rotationAngle: Float,
+    isFlippedHorizontally: Boolean,
     cacheDir: File?,
     context: Context
 ): Uri? {
@@ -995,8 +998,24 @@ private fun cropBitmapToLandscape(
         val targetWidth = 1920
         val targetHeight = 1080
 
-        val imageWidth = bitmap.width.toFloat()
-        val imageHeight = bitmap.height.toFloat()
+        // First, apply rotation and flip to the original bitmap
+        val transformedBitmap = if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+            val matrix = Matrix()
+            // Apply flip
+            if (isFlippedHorizontally) {
+                matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
+            }
+            // Apply rotation
+            if (rotationAngle % 360f != 0f) {
+                matrix.postRotate(rotationAngle, bitmap.width / 2f, bitmap.height / 2f)
+            }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } else {
+            bitmap
+        }
+
+        val imageWidth = transformedBitmap.width.toFloat()
+        val imageHeight = transformedBitmap.height.toFloat()
 
         // We need to calculate what the canvas dimensions would be
         // For simplicity, assume a standard canvas aspect ratio
@@ -1045,9 +1064,9 @@ private fun cropBitmapToLandscape(
         val bitmapCropWidth = (cropFrameWidth / displayWidth * imageWidth).coerceAtMost(imageWidth - bitmapCropLeft)
         val bitmapCropHeight = (cropFrameHeight / displayHeight * imageHeight).coerceAtMost(imageHeight - bitmapCropTop)
 
-        // Crop the bitmap
+        // Crop the transformed bitmap
         val croppedBitmap = Bitmap.createBitmap(
-            bitmap,
+            transformedBitmap,
             bitmapCropLeft.toInt(),
             bitmapCropTop.toInt(),
             bitmapCropWidth.toInt(),
@@ -1068,6 +1087,10 @@ private fun cropBitmapToLandscape(
             finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
         }
 
+        // Clean up bitmaps
+        if (transformedBitmap != bitmap) {
+            transformedBitmap.recycle()
+        }
         croppedBitmap.recycle()
         finalBitmap.recycle()
 
