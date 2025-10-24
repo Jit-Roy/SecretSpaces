@@ -38,7 +38,8 @@ fun MainScreenContainer(
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(NavDestination.HOME) }
     var focusedSecret by remember { mutableStateOf<Secret?>(null) }
-    var selectedImages by rememberSaveable { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    // Use remember (not rememberSaveable) because Uri is not automatically saveable
+    var selectedImages by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
 
     // Use provided scroll state or create fallback (but parent should always provide it now)
     val actualFeedScrollState = feedScrollState ?: rememberSaveable(saver = LazyListState.Saver) {
@@ -108,7 +109,9 @@ fun MainScreenContainer(
                 DropSecretScreen(
                     isLoading = isLoading,
                     onNext = { imageUris ->
+                        println("DEBUG: MainScreenContainer - Next clicked with ${imageUris.size} images")
                         selectedImages = imageUris
+                        println("DEBUG: MainScreenContainer - Navigating to CROP_IMAGES")
                         currentDestination = NavDestination.CROP_IMAGES
                     },
                     onBack = {
@@ -120,16 +123,19 @@ fun MainScreenContainer(
             }
 
             NavDestination.CROP_IMAGES -> {
-                ImageCropScreen(
+                println("DEBUG: MainScreenContainer - Showing CustomImageEditScreen with ${selectedImages.size} images")
+                CustomImageEditScreen(
                     selectedImages = selectedImages,
                     onImagesCropped = { croppedUris ->
+                        println("DEBUG: MainScreenContainer - Images edited: ${croppedUris.size}")
                         selectedImages = croppedUris
+                        println("DEBUG: MainScreenContainer - Navigating to ADD_DESCRIPTION")
                         currentDestination = NavDestination.ADD_DESCRIPTION
                     },
                     onBack = {
+                        println("DEBUG: MainScreenContainer - Back from edit screen")
                         currentDestination = NavDestination.CREATE
-                    },
-                    cacheDir = cacheDir
+                    }
                 )
             }
 

@@ -31,9 +31,11 @@ android {
         val cloudinaryCloudName = properties.getProperty("CLOUDINARY_CLOUD_NAME") ?: ""
         val cloudinaryApiKey = properties.getProperty("CLOUDINARY_API_KEY") ?: ""
         val cloudinaryApiSecret = properties.getProperty("CLOUDINARY_API_SECRET") ?: ""
+        val cloudinaryUnsignedPreset = properties.getProperty("CLOUDINARY_UNSIGNED_PRESET") ?: ""
         buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"$cloudinaryCloudName\"")
         buildConfigField("String", "CLOUDINARY_API_KEY", "\"$cloudinaryApiKey\"")
         buildConfigField("String", "CLOUDINARY_API_SECRET", "\"$cloudinaryApiSecret\"")
+        buildConfigField("String", "CLOUDINARY_UNSIGNED_PRESET", "\"$cloudinaryUnsignedPreset\"")
 
         // Add native library options for 16 KB page size support
         ndk {
@@ -44,11 +46,16 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // Keep debug simple for faster iterations
+            isMinifyEnabled = false
         }
     }
     compileOptions {
@@ -72,15 +79,21 @@ android {
             keepDebugSymbols += "**/*.so"
         }
     }
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+    }
 }
 
 dependencies {
 
     implementation(libs.androidx.core.ktx)
 
-    // Firebase dependencies
-    implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
-    implementation("com.google.firebase:firebase-firestore-ktx:25.1.4")
+    // Firebase using BoM for consistent versions
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
 
     // Cloudinary for image storage
     implementation("com.cloudinary:cloudinary-android:3.1.2")
@@ -112,6 +125,8 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
+    // uCrop for image cropping
+    implementation("com.github.yalantis:ucrop:2.2.8")
 
     // MapLibre for maps (using MapTiler)
     implementation("org.maplibre.gl:android-sdk:11.5.2")

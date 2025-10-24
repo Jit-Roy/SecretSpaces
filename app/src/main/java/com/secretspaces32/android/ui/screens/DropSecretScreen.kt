@@ -7,37 +7,32 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.secretspaces32.android.data.model.User
 import com.secretspaces32.android.ui.theme.DarkBackground
-import com.secretspaces32.android.ui.theme.DarkSurface
 import java.io.File
 
 data class GalleryImage(
@@ -144,34 +139,20 @@ fun DropSecretScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Back arrow and New post text
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start
+                    // Back arrow only (removed "New post" text)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Text(
-                            text = "New post",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    // Next button
+                    // Next button - changed to red color
                     TextButton(
                         onClick = {
                             if (selectedImageUris.isNotEmpty()) {
@@ -184,44 +165,67 @@ fun DropSecretScreen(
                             text = "Next",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedImageUris.isNotEmpty()) Color(0xFF4D9FFF) else Color.White.copy(alpha = 0.5f)
+                            color = if (selectedImageUris.isNotEmpty()) Color.Red else Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }
             }
 
-            // Main Content - Image Preview
+            // Main Content - Image Preview with horizontal scrolling for multiple images
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.6f)
+                    .weight(0.5f)
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 if (selectedImageUris.isNotEmpty()) {
-                    AsyncImage(
-                        model = selectedImageUris.first(),
-                        contentDescription = "Selected image preview",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    // Image counter if multiple selected
-                    if (selectedImageUris.size > 1) {
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(16.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color.Black.copy(alpha = 0.6f)
+                    if (selectedImageUris.size == 1) {
+                        // Single image - show full size
+                        AsyncImage(
+                            model = selectedImageUris.first(),
+                            contentDescription = "Selected image preview",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        // Multiple images - horizontal scrolling
+                        LazyRow(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "1/${selectedImageUris.size}",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                            itemsIndexed(selectedImageUris) { index, uri ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .aspectRatio(3f / 4f)
+                                ) {
+                                    AsyncImage(
+                                        model = uri,
+                                        contentDescription = "Selected image ${index + 1}",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+
+                                    // Image counter badge
+                                    Surface(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(8.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = Color.Black.copy(alpha = 0.6f)
+                                    ) {
+                                        Text(
+                                            text = "${index + 1}/${selectedImageUris.size}",
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -237,7 +241,7 @@ fun DropSecretScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.4f)
+                    .weight(0.5f)
                     .background(DarkBackground)
             ) {
                 // Recents header with SELECT MULTIPLE button
@@ -248,24 +252,13 @@ fun DropSecretScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Recents",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Dropdown",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(start = 4.dp)
-                        )
-                    }
+                    // Removed profile icon from Recents
+                    Text(
+                        text = "Recents",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
 
                     Surface(
                         onClick = {
@@ -279,25 +272,15 @@ fun DropSecretScreen(
                         color = if (isMultiSelectMode) Color(0xFF4D9FFF) else Color.Transparent,
                         border = if (!isMultiSelectMode) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)) else null
                     ) {
-                        Row(
+                        // Removed checkmark icon from SELECT MULTIPLE text
+                        Text(
+                            text = "SELECT MULTIPLE",
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "SELECT MULTIPLE",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 11.sp
-                            )
-                        }
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 11.sp
+                        )
                     }
                 }
 

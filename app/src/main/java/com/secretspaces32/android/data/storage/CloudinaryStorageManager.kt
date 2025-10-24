@@ -24,6 +24,7 @@ class CloudinaryStorageManager(private val context: Context) {
         private val CLOUD_NAME = BuildConfig.CLOUDINARY_CLOUD_NAME
         private val API_KEY = BuildConfig.CLOUDINARY_API_KEY
         private val API_SECRET = BuildConfig.CLOUDINARY_API_SECRET
+        private val UNSIGNED_PRESET = BuildConfig.CLOUDINARY_UNSIGNED_PRESET
 
         // Folder paths in Cloudinary
         private const val PROFILE_PICTURES_FOLDER = "secret_spaces/profile_pictures"
@@ -45,13 +46,17 @@ class CloudinaryStorageManager(private val context: Context) {
         if (!isInitialized) {
             synchronized(this) {
                 if (!isInitialized) {
-                    val config = mapOf(
+                    // Prefer unsigned upload configuration to avoid embedding secrets in the app
+                    val baseConfig = mutableMapOf<String, Any>(
                         "cloud_name" to CLOUD_NAME,
-                        "api_key" to API_KEY,
-                        "api_secret" to API_SECRET,
                         "secure" to true
                     )
-                    MediaManager.init(context, config)
+                    // For backward compatibility, include api_key/secret only if unsigned preset is not set
+                    if (UNSIGNED_PRESET.isNullOrBlank()) {
+                        if (API_KEY.isNotBlank()) baseConfig["api_key"] = API_KEY
+                        if (API_SECRET.isNotBlank()) baseConfig["api_secret"] = API_SECRET
+                    }
+                    MediaManager.init(context, baseConfig)
                     isInitialized = true
                 }
             }
@@ -69,7 +74,7 @@ class CloudinaryStorageManager(private val context: Context) {
         return try {
             val timestamp = System.currentTimeMillis()
 
-            val options = mapOf(
+            val options = mutableMapOf<String, Any>(
                 "folder" to "$PROFILE_PICTURES_FOLDER/$userId",
                 "public_id" to "profile_$timestamp",
                 "resource_type" to "image",
@@ -81,6 +86,9 @@ class CloudinaryStorageManager(private val context: Context) {
                 "overwrite" to true,
                 "invalidate" to true
             )
+            if (!UNSIGNED_PRESET.isNullOrBlank()) {
+                options["upload_preset"] = UNSIGNED_PRESET
+            }
 
             uploadImage(imageUri, options)
         } catch (e: Exception) {
@@ -101,7 +109,7 @@ class CloudinaryStorageManager(private val context: Context) {
             val id = postId ?: UUID.randomUUID().toString()
             val filename = "${id}_$timestamp"
 
-            val options = mapOf(
+            val options = mutableMapOf<String, Any>(
                 "folder" to "$POST_IMAGES_FOLDER/$userId",
                 "public_id" to filename,
                 "resource_type" to "image",
@@ -112,6 +120,9 @@ class CloudinaryStorageManager(private val context: Context) {
                     "postId" to id
                 )
             )
+            if (!UNSIGNED_PRESET.isNullOrBlank()) {
+                options["upload_preset"] = UNSIGNED_PRESET
+            }
 
             uploadImage(imageUri, options)
         } catch (e: Exception) {
@@ -133,7 +144,7 @@ class CloudinaryStorageManager(private val context: Context) {
             val filename = "story_$timestamp"
             val expiresAt = timestamp + (24 * 60 * 60 * 1000) // 24 hours
 
-            val options = mapOf(
+            val options = mutableMapOf<String, Any>(
                 "folder" to "$STORY_IMAGES_FOLDER/$userId",
                 "public_id" to filename,
                 "resource_type" to "image",
@@ -144,6 +155,9 @@ class CloudinaryStorageManager(private val context: Context) {
                     "expiresAt" to expiresAt.toString()
                 )
             )
+            if (!UNSIGNED_PRESET.isNullOrBlank()) {
+                options["upload_preset"] = UNSIGNED_PRESET
+            }
 
             uploadImage(imageUri, options)
         } catch (e: Exception) {
@@ -162,14 +176,8 @@ class CloudinaryStorageManager(private val context: Context) {
             val requestId = MediaManager.get().upload(imageUri)
                 .options(options)
                 .callback(object : UploadCallback {
-                    override fun onStart(requestId: String) {
-                        // Upload started
-                    }
-
-                    override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
-                        // Progress update
-                    }
-
+                    override fun onStart(requestId: String) { /* no-op */ }
+                    override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) { /* no-op */ }
                     override fun onSuccess(requestId: String, resultData: Map<*, *>) {
                         val secureUrl = resultData["secure_url"] as? String
                         if (secureUrl != null) {
@@ -180,16 +188,12 @@ class CloudinaryStorageManager(private val context: Context) {
                             )
                         }
                     }
-
                     override fun onError(requestId: String, error: ErrorInfo) {
                         continuation.resume(
                             Result.failure(Exception("Upload failed: ${error.description}"))
                         )
                     }
-
-                    override fun onReschedule(requestId: String, error: ErrorInfo) {
-                        // Upload rescheduled
-                    }
+                    override fun onReschedule(requestId: String, error: ErrorInfo) { /* no-op */ }
                 })
                 .dispatch()
 
@@ -197,9 +201,7 @@ class CloudinaryStorageManager(private val context: Context) {
                 // Cancel the upload if coroutine is cancelled
                 try {
                     MediaManager.get().cancelRequest(requestId)
-                } catch (_: Exception) {
-                    // Ignore cancellation errors
-                }
+                } catch (_: Exception) { }
             }
         } catch (e: Exception) {
             continuation.resume(Result.failure(Exception("Failed to start upload: ${e.message}", e)))
@@ -214,7 +216,6 @@ class CloudinaryStorageManager(private val context: Context) {
         return try {
             // Note: Cloudinary Android SDK doesn't support deletion directly
             // You'll need to use the REST API or admin SDK for deletion
-            // For now, we'll return success as images can be managed from Cloudinary dashboard
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(Exception("Failed to delete image: ${e.message}", e))
@@ -226,7 +227,6 @@ class CloudinaryStorageManager(private val context: Context) {
      */
     @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER")
     suspend fun deleteUserProfilePictures(userId: String): Result<Unit> {
-        // Cloudinary Android SDK doesn't support bulk deletion
         // Use Cloudinary dashboard or admin API for bulk operations
         return Result.success(Unit)
     }
@@ -236,8 +236,6 @@ class CloudinaryStorageManager(private val context: Context) {
      */
     @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER")
     suspend fun deleteUserPosts(userId: String): Result<Unit> {
-        // Cloudinary Android SDK doesn't support bulk deletion
-        // Use Cloudinary dashboard or admin API for bulk operations
         return Result.success(Unit)
     }
 
@@ -246,8 +244,6 @@ class CloudinaryStorageManager(private val context: Context) {
      */
     @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER")
     suspend fun deleteUserStories(userId: String): Result<Unit> {
-        // Cloudinary Android SDK doesn't support bulk deletion
-        // Use Cloudinary dashboard or admin API for bulk operations
         return Result.success(Unit)
     }
 
