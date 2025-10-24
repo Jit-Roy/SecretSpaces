@@ -3,6 +3,7 @@ package com.secretspaces32.android.ui.screens
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -21,6 +22,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.abs
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +61,8 @@ fun ImageCropScreen(
     var cropFrameScale by rememberSaveable { mutableFloatStateOf(0.9f) }
     var cropFrameOffsetX by rememberSaveable { mutableFloatStateOf(0f) }
     var cropFrameOffsetY by rememberSaveable { mutableFloatStateOf(0f) }
+    var rotationAngle by rememberSaveable { mutableFloatStateOf(0f) }
+    var isFlippedHorizontally by rememberSaveable { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -67,6 +76,8 @@ fun ImageCropScreen(
             cropFrameScale = 0.9f
             cropFrameOffsetX = 0f
             cropFrameOffsetY = 0f
+            rotationAngle = 0f
+            isFlippedHorizontally = false
             isLoading = false
         }
     }
@@ -77,7 +88,7 @@ fun ImageCropScreen(
             coroutineScope.launch {
                 isSaving = true
                 val croppedUri = withContext(Dispatchers.IO) {
-                    cropBitmapToLandscape(bitmap, imageScale, cropFrameScale, cropFrameOffsetX, cropFrameOffsetY, cacheDir, context)
+                    cropBitmapToLandscape(bitmap, imageScale, cropFrameScale, cropFrameOffsetX, cropFrameOffsetY, rotationAngle, isFlippedHorizontally, cacheDir, context)
                 }
 
                 croppedUri?.let {
@@ -176,6 +187,8 @@ fun ImageCropScreen(
                             cropFrameScale = cropFrameScale,
                             cropFrameOffsetX = cropFrameOffsetX,
                             cropFrameOffsetY = cropFrameOffsetY,
+                            rotationAngle = rotationAngle,
+                            isFlippedHorizontally = isFlippedHorizontally,
                             onTransform = { newImageScale, newCropScale, newOffsetX, newOffsetY ->
                                 imageScale = newImageScale
                                 cropFrameScale = newCropScale
@@ -196,6 +209,59 @@ fun ImageCropScreen(
                     color = Color.White.copy(alpha = 0.7f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
+
+                // Rotation and Flip Controls
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Rotate Left Button
+                    Button(
+                        onClick = {
+                            rotationAngle = (rotationAngle - 90f) % 360f
+                            // Reset crop frame to center when rotating
+                            cropFrameOffsetX = 0f
+                            cropFrameOffsetY = 0f
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF333333)
+                        )
+                    ) {
+                        Text("↶ Rotate")
+                    }
+                    
+                    // Flip Horizontal Button
+                    Button(
+                        onClick = {
+                            isFlippedHorizontally = !isFlippedHorizontally
+                            // Reset crop frame to center when flipping
+                            cropFrameOffsetX = 0f
+                            cropFrameOffsetY = 0f
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF333333)
+                        )
+                    ) {
+                        Text("⇄ Flip")
+                    }
+                    
+                    // Rotate Right Button
+                    Button(
+                        onClick = {
+                            rotationAngle = (rotationAngle + 90f) % 360f
+                            // Reset crop frame to center when rotating
+                            cropFrameOffsetX = 0f
+                            cropFrameOffsetY = 0f
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF333333)
+                        )
+                    ) {
+                        Text("Rotate ↷")
+                    }
+                }
 
                 // Bottom button
                 Button(
@@ -228,6 +294,123 @@ fun ImageCropScreen(
     }
 }
 
+// Helper function to compute display dimensions
+private fun computeDisplayDims(
+    canvasWidth: Float,
+    canvasHeight: Float,
+    imgW: Float,
+    imgH: Float,
+    scale: Float
+): Pair<Float, Float> {
+    val imageAspect = imgW / imgH
+    val canvasAspect = canvasWidth / canvasHeight
+    return if (imageAspect > canvasAspect) {
+        val dw = canvasWidth * scale
+        val dh = dw / imageAspect
+        dw to dh
+    } else {
+        val dh = canvasHeight * scale
+        val dw = dh * imageAspect
+        dw to dh
+    }
+}
+
+// Helper function to get rectangle corners
+private fun rectCorners(rect: Rect): List<Offset> {
+    return listOf(
+        Offset(rect.left, rect.top),
+        Offset(rect.right, rect.top),
+        Offset(rect.right, rect.bottom),
+        Offset(rect.left, rect.bottom)
+    )
+}
+
+// Helper: Check if a point is inside a convex polygon using cross product
+private fun isPointInPolygon(point: Offset, polygon: List<Offset>): Boolean {
+    if (polygon.size < 3) return false
+    
+    // Use a more robust point-in-polygon test that works regardless of winding order
+    var positiveCount = 0
+    var negativeCount = 0
+    
+    for (i in polygon.indices) {
+        val p1 = polygon[i]
+        val p2 = polygon[(i + 1) % polygon.size]
+        
+        val crossProduct = (p2.x - p1.x) * (point.y - p1.y) - (p2.y - p1.y) * (point.x - p1.x)
+        
+        if (crossProduct > 0.01f) {
+            positiveCount++
+        } else if (crossProduct < -0.01f) {
+            negativeCount++
+        }
+    }
+    
+    // Point is inside if all cross products have the same sign (all positive or all negative)
+    // Allow small tolerance for floating point errors
+    return positiveCount == polygon.size || negativeCount == polygon.size
+}
+
+// Check if a rectangle is inside the rotated image
+private fun isRectInsideRotatedImage(
+    rect: Rect,
+    canvasWidth: Float,
+    canvasHeight: Float,
+    imgW: Float,
+    imgH: Float,
+    scale: Float,
+    rotation: Float,
+    isFlippedHorizontally: Boolean
+): Boolean {
+    val (dw0, dh0) = computeDisplayDims(canvasWidth, canvasHeight, imgW, imgH, scale)
+    var hw = dw0 / 2f
+    var hh = dh0 / 2f
+    // Shrink a bit to avoid floating-point edge leaks
+    val margin = 4.0f
+    hw = (hw - margin).coerceAtLeast(0f)
+    hh = (hh - margin).coerceAtLeast(0f)
+    val cx = canvasWidth / 2f
+    val cy = canvasHeight / 2f
+    
+    // Compute the rotated image polygon corners in canvas space
+    val rad = (rotation % 360f) * (PI.toFloat() / 180f)
+    val c = cos(rad)
+    val s = sin(rad)
+    
+    // Image corners in local space (before any transformation)
+    val imgCorners = arrayOf(
+        Offset(-hw, -hh),
+        Offset(hw, -hh),
+        Offset(hw, hh),
+        Offset(-hw, hh)
+    )
+    
+    // Transform image corners to canvas space
+    // The transformation in Canvas applies: first scale/flip, then rotate
+    // So we need to apply transformations in the same order
+    val transformedImgCorners = imgCorners.map { p ->
+        var x = p.x
+        val y = p.y
+        // Apply horizontal flip first (this is applied before rotation in the canvas)
+        if (isFlippedHorizontally) {
+            x = -x
+        }
+        // Then apply rotation around center
+        val rotX = x * c - y * s + cx
+        val rotY = x * s + y * c + cy
+        Offset(rotX, rotY)
+    }
+    
+    // Check if all crop rect corners are inside the rotated image polygon
+    val cropCorners = rectCorners(rect)
+    for (p in cropCorners) {
+        if (!isPointInPolygon(p, transformedImgCorners)) {
+            return false
+        }
+    }
+    return true
+}
+
 @Composable
 fun CropView(
     bitmap: Bitmap,
@@ -235,6 +418,8 @@ fun CropView(
     cropFrameScale: Float,
     cropFrameOffsetX: Float,
     cropFrameOffsetY: Float,
+    rotationAngle: Float = 0f,
+    isFlippedHorizontally: Boolean = false,
     onTransform: (Float, Float, Float, Float) -> Unit
 ) {
     var currentImageScale by remember { mutableFloatStateOf(imageScale) }
@@ -361,13 +546,25 @@ fun CropView(
                                         initialWidth
                                     }
 
-                                    // Helper: clamp offsets to keep frame inside image
+                                    // Helper: clamp offsets to keep frame inside rotated image
                                     fun clampOffsets(width: Float, height: Float, proposedLeft: Float, proposedTop: Float): Pair<Float, Float> {
-                                        val minX = imageLeft
-                                        val maxX = imageRight - width
-                                        val minY = imageTop
-                                        val maxY = imageBottom - height
-                                        return proposedLeft.coerceIn(minX, maxX) to proposedTop.coerceIn(minY, maxY)
+                                        // For rotated images, use boundary checking
+                                        if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+                                            val testRect = Rect(proposedLeft, proposedTop, proposedLeft + width, proposedTop + height)
+                                            if (isRectInsideRotatedImage(testRect, canvasWidth, canvasHeight, imageWidth, imageHeight, currentImageScale, rotationAngle, isFlippedHorizontally)) {
+                                                return proposedLeft to proposedTop
+                                            }
+                                            // If the proposed position is invalid, try to find a valid position by adjusting slightly
+                                            // For simplicity, just return the current position to prevent invalid moves
+                                            return currentCropOffsetX to currentCropOffsetY
+                                        } else {
+                                            // For non-rotated images, use simple bounding box
+                                            val minX = imageLeft
+                                            val maxX = imageRight - width
+                                            val minY = imageTop
+                                            val maxY = imageBottom - height
+                                            return proposedLeft.coerceIn(minX, maxX) to proposedTop.coerceIn(minY, maxY)
+                                        }
                                     }
 
                                     fun applyResize(newWidth: Float, anchorLeft: Boolean, anchorTop: Boolean) {
@@ -390,9 +587,19 @@ fun CropView(
 
                                         val (clampedLeft, clampedTop) = clampOffsets(width, height, left, top)
 
-                                        currentCropFrameScale = newScale
-                                        currentCropOffsetX = clampedLeft
-                                        currentCropOffsetY = clampedTop
+                                        // Only apply if the new position is valid
+                                        val testRect = Rect(clampedLeft, clampedTop, clampedLeft + width, clampedTop + height)
+                                        if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+                                            if (isRectInsideRotatedImage(testRect, canvasWidth, canvasHeight, imageWidth, imageHeight, currentImageScale, rotationAngle, isFlippedHorizontally)) {
+                                                currentCropFrameScale = newScale
+                                                currentCropOffsetX = clampedLeft
+                                                currentCropOffsetY = clampedTop
+                                            }
+                                        } else {
+                                            currentCropFrameScale = newScale
+                                            currentCropOffsetX = clampedLeft
+                                            currentCropOffsetY = clampedTop
+                                        }
                                     }
 
                                     when (draggedEdge) {
@@ -476,26 +683,36 @@ fun CropView(
                                             displayWidth = displayHeight * imageAspect
                                         }
 
-                                        val imageLeft = (canvasWidth - displayWidth) / 2f
-                                        val imageTop = (canvasHeight - displayHeight) / 2f
-                                        val imageRight = imageLeft + displayWidth
-                                        val imageBottom = imageTop + displayHeight
-
                                         val updatedCropWidth = canvasWidth * currentCropFrameScale
                                         val updatedCropHeight = updatedCropWidth * 9f / 16f
 
-                                        val minCropOffsetX = imageLeft
-                                        val maxCropOffsetX = imageRight - updatedCropWidth
-                                        val minCropOffsetY = imageTop
-                                        val maxCropOffsetY = imageBottom - updatedCropHeight
+                                        // Use boundary checking for rotated images
+                                        if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+                                            val testRect = Rect(newCropOffsetX, newCropOffsetY, newCropOffsetX + updatedCropWidth, newCropOffsetY + updatedCropHeight)
+                                            if (isRectInsideRotatedImage(testRect, canvasWidth, canvasHeight, imageWidth, imageHeight, currentImageScale, rotationAngle, isFlippedHorizontally)) {
+                                                currentCropOffsetX = newCropOffsetX
+                                                currentCropOffsetY = newCropOffsetY
+                                            }
+                                        } else {
+                                            // For non-rotated images, use simple bounding box
+                                            val imageLeft = (canvasWidth - displayWidth) / 2f
+                                            val imageTop = (canvasHeight - displayHeight) / 2f
+                                            val imageRight = imageLeft + displayWidth
+                                            val imageBottom = imageTop + displayHeight
 
-                                        newCropOffsetX = newCropOffsetX.coerceIn(minCropOffsetX, maxCropOffsetX)
-                                        newCropOffsetY = newCropOffsetY.coerceIn(minCropOffsetY, maxCropOffsetY)
+                                            val minCropOffsetX = imageLeft
+                                            val maxCropOffsetX = imageRight - updatedCropWidth
+                                            val minCropOffsetY = imageTop
+                                            val maxCropOffsetY = imageBottom - updatedCropHeight
 
-                                        currentCropOffsetX = newCropOffsetX
-                                        currentCropOffsetY = newCropOffsetY
+                                            newCropOffsetX = newCropOffsetX.coerceIn(minCropOffsetX, maxCropOffsetX)
+                                            newCropOffsetY = newCropOffsetY.coerceIn(minCropOffsetY, maxCropOffsetY)
+
+                                            currentCropOffsetX = newCropOffsetX
+                                            currentCropOffsetY = newCropOffsetY
+                                        }
+                                        
                                         initialTouchPoint = touch
-
                                         onTransform(currentImageScale, currentCropFrameScale, currentCropOffsetX, currentCropOffsetY)
                                     }
                                 }
@@ -566,13 +783,28 @@ fun CropView(
         val imageLeft = (canvasWidth - displayWidth) / 2f
         val imageTop = (canvasHeight - displayHeight) / 2f
 
-        // Draw the image at fixed centered position
+        // Draw the image at fixed centered position with rotation and flip
         val imageBitmap = bitmap.asImageBitmap()
-        drawImage(
-            image = imageBitmap,
-            dstOffset = IntOffset(imageLeft.toInt(), imageTop.toInt()),
-            dstSize = IntSize(displayWidth.toInt(), displayHeight.toInt())
-        )
+        val centerX = canvasWidth / 2f
+        val centerY = canvasHeight / 2f
+        
+        // Apply transformations (rotation and flip) around the center
+        rotate(
+            degrees = rotationAngle,
+            pivot = Offset(centerX, centerY)
+        ) {
+            scale(
+                scaleX = if (isFlippedHorizontally) -1f else 1f,
+                scaleY = 1f,
+                pivot = Offset(centerX, centerY)
+            ) {
+                drawImage(
+                    image = imageBitmap,
+                    dstOffset = IntOffset(imageLeft.toInt(), imageTop.toInt()),
+                    dstSize = IntSize(displayWidth.toInt(), displayHeight.toInt())
+                )
+            }
+        }
 
         // Calculate 16:9 crop frame (movable and scalable)
         val cropWidth = canvasWidth * currentCropFrameScale
@@ -761,6 +993,8 @@ private fun cropBitmapToLandscape(
     cropFrameScale: Float,
     cropFrameOffsetX: Float,
     cropFrameOffsetY: Float,
+    rotationAngle: Float,
+    isFlippedHorizontally: Boolean,
     cacheDir: File?,
     context: Context
 ): Uri? {
@@ -769,6 +1003,8 @@ private fun cropBitmapToLandscape(
         val targetWidth = 1920
         val targetHeight = 1080
 
+        // Use the ORIGINAL bitmap dimensions for display calculation (not rotated)
+        // This matches how CropView calculates display dimensions
         val imageWidth = bitmap.width.toFloat()
         val imageHeight = bitmap.height.toFloat()
 
@@ -813,13 +1049,14 @@ private fun cropBitmapToLandscape(
             cropFrameOffsetY
         }
 
-        // Convert crop frame coordinates to bitmap coordinates
+        // Convert crop frame coordinates to ORIGINAL bitmap coordinates
+        // These coordinates are in the image space BEFORE rotation/flip
         val bitmapCropLeft = ((cropLeft - imageLeft) / displayWidth * imageWidth).coerceIn(0f, imageWidth)
         val bitmapCropTop = ((cropTop - imageTop) / displayHeight * imageHeight).coerceIn(0f, imageHeight)
         val bitmapCropWidth = (cropFrameWidth / displayWidth * imageWidth).coerceAtMost(imageWidth - bitmapCropLeft)
         val bitmapCropHeight = (cropFrameHeight / displayHeight * imageHeight).coerceAtMost(imageHeight - bitmapCropTop)
 
-        // Crop the bitmap
+        // Crop the ORIGINAL bitmap first
         val croppedBitmap = Bitmap.createBitmap(
             bitmap,
             bitmapCropLeft.toInt(),
@@ -828,9 +1065,27 @@ private fun cropBitmapToLandscape(
             bitmapCropHeight.toInt()
         )
 
+        // Then apply rotation and flip to the CROPPED bitmap
+        val transformedCroppedBitmap = if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+            val matrix = Matrix()
+            // Apply flip
+            if (isFlippedHorizontally) {
+                matrix.postScale(-1f, 1f, croppedBitmap.width / 2f, croppedBitmap.height / 2f)
+            }
+            // Apply rotation
+            if (rotationAngle % 360f != 0f) {
+                matrix.postRotate(rotationAngle, croppedBitmap.width / 2f, croppedBitmap.height / 2f)
+            }
+            val result = Bitmap.createBitmap(croppedBitmap, 0, 0, croppedBitmap.width, croppedBitmap.height, matrix, true)
+            croppedBitmap.recycle() // Free the intermediate bitmap
+            result
+        } else {
+            croppedBitmap
+        }
+
         // Scale to target dimensions
         val finalBitmap = Bitmap.createScaledBitmap(
-            croppedBitmap,
+            transformedCroppedBitmap,
             targetWidth,
             targetHeight,
             true
@@ -842,7 +1097,8 @@ private fun cropBitmapToLandscape(
             finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
         }
 
-        croppedBitmap.recycle()
+        // Clean up bitmaps
+        transformedCroppedBitmap.recycle()
         finalBitmap.recycle()
 
         return androidx.core.content.FileProvider.getUriForFile(
