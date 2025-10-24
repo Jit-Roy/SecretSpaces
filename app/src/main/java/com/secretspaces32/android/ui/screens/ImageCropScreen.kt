@@ -329,21 +329,26 @@ private fun rectCorners(rect: Rect): List<Offset> {
 private fun isPointInPolygon(point: Offset, polygon: List<Offset>): Boolean {
     if (polygon.size < 3) return false
     
-    var sign = 0
+    // Use a more robust point-in-polygon test that works regardless of winding order
+    var positiveCount = 0
+    var negativeCount = 0
+    
     for (i in polygon.indices) {
         val p1 = polygon[i]
         val p2 = polygon[(i + 1) % polygon.size]
         
         val crossProduct = (p2.x - p1.x) * (point.y - p1.y) - (p2.y - p1.y) * (point.x - p1.x)
         
-        if (i == 0) {
-            sign = if (crossProduct >= 0) 1 else -1
-        } else {
-            val currentSign = if (crossProduct >= 0) 1 else -1
-            if (currentSign != sign) return false
+        if (crossProduct > 0.01f) {
+            positiveCount++
+        } else if (crossProduct < -0.01f) {
+            negativeCount++
         }
     }
-    return true
+    
+    // Point is inside if all cross products have the same sign (all positive or all negative)
+    // Allow small tolerance for floating point errors
+    return positiveCount == polygon.size || negativeCount == polygon.size
 }
 
 // Check if a rectangle is inside the rotated image
