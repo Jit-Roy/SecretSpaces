@@ -1003,24 +1003,10 @@ private fun cropBitmapToLandscape(
         val targetWidth = 1920
         val targetHeight = 1080
 
-        // First, apply rotation and flip to the original bitmap
-        val transformedBitmap = if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
-            val matrix = Matrix()
-            // Apply flip
-            if (isFlippedHorizontally) {
-                matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
-            }
-            // Apply rotation
-            if (rotationAngle % 360f != 0f) {
-                matrix.postRotate(rotationAngle, bitmap.width / 2f, bitmap.height / 2f)
-            }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } else {
-            bitmap
-        }
-
-        val imageWidth = transformedBitmap.width.toFloat()
-        val imageHeight = transformedBitmap.height.toFloat()
+        // Use the ORIGINAL bitmap dimensions for display calculation (not rotated)
+        // This matches how CropView calculates display dimensions
+        val imageWidth = bitmap.width.toFloat()
+        val imageHeight = bitmap.height.toFloat()
 
         // We need to calculate what the canvas dimensions would be
         // For simplicity, assume a standard canvas aspect ratio
@@ -1063,24 +1049,43 @@ private fun cropBitmapToLandscape(
             cropFrameOffsetY
         }
 
-        // Convert crop frame coordinates to bitmap coordinates
+        // Convert crop frame coordinates to ORIGINAL bitmap coordinates
+        // These coordinates are in the image space BEFORE rotation/flip
         val bitmapCropLeft = ((cropLeft - imageLeft) / displayWidth * imageWidth).coerceIn(0f, imageWidth)
         val bitmapCropTop = ((cropTop - imageTop) / displayHeight * imageHeight).coerceIn(0f, imageHeight)
         val bitmapCropWidth = (cropFrameWidth / displayWidth * imageWidth).coerceAtMost(imageWidth - bitmapCropLeft)
         val bitmapCropHeight = (cropFrameHeight / displayHeight * imageHeight).coerceAtMost(imageHeight - bitmapCropTop)
 
-        // Crop the transformed bitmap
+        // Crop the ORIGINAL bitmap first
         val croppedBitmap = Bitmap.createBitmap(
-            transformedBitmap,
+            bitmap,
             bitmapCropLeft.toInt(),
             bitmapCropTop.toInt(),
             bitmapCropWidth.toInt(),
             bitmapCropHeight.toInt()
         )
 
+        // Then apply rotation and flip to the CROPPED bitmap
+        val transformedCroppedBitmap = if (rotationAngle % 360f != 0f || isFlippedHorizontally) {
+            val matrix = Matrix()
+            // Apply flip
+            if (isFlippedHorizontally) {
+                matrix.postScale(-1f, 1f, croppedBitmap.width / 2f, croppedBitmap.height / 2f)
+            }
+            // Apply rotation
+            if (rotationAngle % 360f != 0f) {
+                matrix.postRotate(rotationAngle, croppedBitmap.width / 2f, croppedBitmap.height / 2f)
+            }
+            val result = Bitmap.createBitmap(croppedBitmap, 0, 0, croppedBitmap.width, croppedBitmap.height, matrix, true)
+            croppedBitmap.recycle() // Free the intermediate bitmap
+            result
+        } else {
+            croppedBitmap
+        }
+
         // Scale to target dimensions
         val finalBitmap = Bitmap.createScaledBitmap(
-            croppedBitmap,
+            transformedCroppedBitmap,
             targetWidth,
             targetHeight,
             true
@@ -1093,10 +1098,7 @@ private fun cropBitmapToLandscape(
         }
 
         // Clean up bitmaps
-        if (transformedBitmap != bitmap) {
-            transformedBitmap.recycle()
-        }
-        croppedBitmap.recycle()
+        transformedCroppedBitmap.recycle()
         finalBitmap.recycle()
 
         return androidx.core.content.FileProvider.getUriForFile(
