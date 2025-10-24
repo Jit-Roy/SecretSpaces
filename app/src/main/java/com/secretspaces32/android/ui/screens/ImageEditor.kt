@@ -65,7 +65,7 @@ data class ImageEditState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CustomImageEditScreen(
+fun ImageEditor(
     selectedImages: List<Uri>,
     onImagesCropped: (List<Uri>) -> Unit,
     onBack: () -> Unit = {}
@@ -96,6 +96,7 @@ fun CustomImageEditScreen(
             context.contentResolver.openInputStream(source)?.use { input ->
                 val original = BitmapFactory.decodeStream(input)
                 val m = Matrix().apply { postScale(-1f, 1f, original.width / 2f, original.height / 2f) }
+                @Suppress("DEPRECATION")
                 val flipped = Bitmap.createBitmap(original, 0, 0, original.width, original.height, m, true)
                 val outFile = File(context.cacheDir, "flipped_${System.currentTimeMillis()}_${currentImageIndex}.jpg")
                 FileOutputStream(outFile).use { flipped.compress(Bitmap.CompressFormat.JPEG, 95, it) }
@@ -110,17 +111,21 @@ fun CustomImageEditScreen(
     fun configureUCropView(view: UCropView, imageUri: Uri) {
         val crop = view.cropImageView
         val overlay = view.overlayView
-        // Configure gestures and visuals similar to uCrop default
-        crop.setScaleEnabled(true)
-        crop.setRotateEnabled(true)
+        crop.isScaleEnabled = true
+        crop.isRotateEnabled = true
         crop.setMaxResultImageSizeX(4096)
         crop.setMaxResultImageSizeY(4096)
         crop.setImageToWrapCropBounds(true)
-        // Start with 16:9 landscape box, allow freestyle resize
+        // Lock aspect ratio to 16:9 - crop box is resizable but maintains the ratio
         overlay.setShowCropGrid(true)
         overlay.setShowCropFrame(true)
-        overlay.setFreestyleCropMode(OverlayView.FREESTYLE_CROP_MODE_ENABLE)
-        crop.setTargetAspectRatio(16f / 9f)
+        // DON'T set freestyleCropMode at all - this allows resizing with locked aspect ratio
+        // Setting DISABLE would lock the frame completely
+        // Setting ENABLE would allow free aspect ratio changes
+        // Not setting it allows resize while maintaining the target aspect ratio
+        overlay.setDimmedColor(Color.Black.copy(alpha = 0.6f).toArgb())
+        // Set target aspect ratio to 16:9 - this locks the ratio during resize
+        crop.targetAspectRatio = 16f / 9f
 
         // Prepare output destination per load
         val out = File(view.context.cacheDir, "ucrop_embed_${System.currentTimeMillis()}.jpg")
@@ -143,17 +148,17 @@ fun CustomImageEditScreen(
         } catch (t: Throwable) {
             t.printStackTrace()
         }
-        kotlinx.coroutines.suspendCancellableCoroutine<Uri?> { cont ->
+        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
             cropView.cropAndSaveImage(
                 Bitmap.CompressFormat.JPEG,
                 90,
                 object : BitmapCropCallback {
                     override fun onBitmapCropped(resultUri: Uri, offsetX: Int, offsetY: Int, imageWidth: Int, imageHeight: Int) {
-                        cont.resume(resultUri, onCancellation = {})
+                        cont.resume(resultUri, null)
                     }
                     override fun onCropFailure(t: Throwable) {
                         t.printStackTrace()
-                        cont.resume(null, onCancellation = {})
+                        cont.resume(null, null)
                     }
                 }
             )
@@ -180,6 +185,7 @@ fun CustomImageEditScreen(
                     // Do not apply editState.rotation here to avoid double-rotation
                 }
 
+                @Suppress("DEPRECATION")
                 bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 
                 val colorMatrix = ColorMatrix().apply {
@@ -200,7 +206,9 @@ fun CustomImageEditScreen(
                     )))
                 }
 
+                @Suppress("DEPRECATION")
                 val paint = android.graphics.Paint().apply { colorFilter = ColorMatrixColorFilter(colorMatrix) }
+                @Suppress("DEPRECATION")
                 val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(resultBitmap)
                 canvas.drawBitmap(bitmap, 0f, 0f, paint)

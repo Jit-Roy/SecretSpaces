@@ -57,7 +57,7 @@
         <!-- UCrop Activity for image cropping -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullSensor"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="false" />
 
