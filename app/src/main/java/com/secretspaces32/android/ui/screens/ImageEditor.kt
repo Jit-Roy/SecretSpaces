@@ -349,43 +349,46 @@ fun ImageEditor(
                 }
             }
 
-            // Edit Mode Selector
-            EditModeSelector(
-                selectedMode = editMode,
-                onModeSelected = { editMode = it },
-                onRotate = {
-                    uCropViewRef?.cropImageView?.postRotate(-90f)
-                    uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
-                },
-                onFlipH = {
-                    val src = currentImageUri ?: return@EditModeSelector
-                    scope.launch {
-                        val flippedUri = flipCurrentImageHorizontal(src)
-                        flippedUri?.let { uri ->
-                            val updated = croppedImageUris.toMutableMap()
-                            updated[currentImageIndex] = uri
-                            croppedImageUris = updated.toMap()
-                            uCropViewRef?.let { configureUCropView(it, uri) }
-                        }
-                    }
-                }
-            )
-
-            // Controls
+            // Controls section (above the mode selector buttons)
             when (editMode) {
-                EditMode.CROP -> CropControls(
-                    editState = editState,
-                    onEditStateChange = { editState = it },
-                    onRotate = { degrees ->
-                        uCropViewRef?.cropImageView?.postRotate(degrees)
-                        uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
-                    }
-                )
+                EditMode.CROP -> {
+                    // Crop-specific controls (rotation/flip buttons and slider)
+                    CropControlsSection(
+                        editState = editState,
+                        onEditStateChange = { editState = it },
+                        onRotate = {
+                            uCropViewRef?.cropImageView?.postRotate(-90f)
+                            uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
+                        },
+                        onRotateFine = { degrees ->
+                            uCropViewRef?.cropImageView?.postRotate(degrees)
+                            uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
+                        },
+                        onFlipH = {
+                            val src = currentImageUri ?: return@CropControlsSection
+                            scope.launch {
+                                val flippedUri = flipCurrentImageHorizontal(src)
+                                flippedUri?.let { uri ->
+                                    val updated = croppedImageUris.toMutableMap()
+                                    updated[currentImageIndex] = uri
+                                    croppedImageUris = updated.toMap()
+                                    uCropViewRef?.let { configureUCropView(it, uri) }
+                                }
+                            }
+                        }
+                    )
+                }
                 EditMode.FILTER -> FilterControls(editState, onEditStateChange = { editState = it })
                 EditMode.ADJUST -> AdjustControls(editState, onEditStateChange = { editState = it })
                 EditMode.STICKER -> StickerControls()
                 EditMode.MORE -> MoreControls()
             }
+
+            // Mode selector buttons (always at the bottom)
+            EditModeSelector(
+                selectedMode = editMode,
+                onModeSelected = { editMode = it }
+            )
         }
     }
 }
@@ -459,75 +462,99 @@ fun ImageEditCanvas(
 @Composable
 fun EditModeSelector(
     selectedMode: EditMode,
-    onModeSelected: (EditMode) -> Unit,
-    onRotate: () -> Unit = {},
-    onFlipH: () -> Unit = {}
+    onModeSelected: (EditMode) -> Unit
+) {
+    // BOTTOM: Mode selector buttons (always at the same position)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .navigationBarsPadding()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        EditModeButton(
+            icon = Icons.Default.CropRotate,
+            label = "Crop",
+            isSelected = selectedMode == EditMode.CROP,
+            onClick = { onModeSelected(EditMode.CROP) }
+        )
+        EditModeButton(
+            icon = Icons.Default.FilterList,
+            label = "Filter",
+            isSelected = selectedMode == EditMode.FILTER,
+            onClick = { onModeSelected(EditMode.FILTER) }
+        )
+        EditModeButton(
+            icon = Icons.Default.Tune,
+            label = "Adjust",
+            isSelected = selectedMode == EditMode.ADJUST,
+            onClick = { onModeSelected(EditMode.ADJUST) }
+        )
+        EditModeButton(
+            icon = Icons.Default.EmojiEmotions,
+            label = "Sticker",
+            isSelected = selectedMode == EditMode.STICKER,
+            onClick = { onModeSelected(EditMode.STICKER) }
+        )
+        EditModeButton(
+            icon = Icons.Default.MoreHoriz,
+            label = "More",
+            isSelected = selectedMode == EditMode.MORE,
+            onClick = { onModeSelected(EditMode.MORE) }
+        )
+    }
+}
+
+@Composable
+fun CropControlsSection(
+    editState: ImageEditState,
+    onEditStateChange: (ImageEditState) -> Unit,
+    onRotate: () -> Unit,
+    onRotateFine: (Float) -> Unit,
+    onFlipH: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Black.copy(alpha = 0.9f))
+            .padding(vertical = 12.dp)
     ) {
-        // Rotation and Flip buttons (only show in CROP mode)
-        if (selectedMode == EditMode.CROP) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onRotate,
-                    modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
-                ) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Rotate -90", tint = Color.White)
-                }
-                IconButton(
-                    onClick = onFlipH,
-                    modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
-                ) {
-                    Icon(imageVector = Icons.Default.Flip, contentDescription = "Flip H", tint = Color.White)
-                }
-            }
-        }
-
-        // Mode selector buttons
+        // TOP: Rotation and Flip buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            EditModeButton(
-                icon = Icons.Default.CropRotate,
-                label = "Crop",
-                isSelected = selectedMode == EditMode.CROP,
-                onClick = { onModeSelected(EditMode.CROP) }
-            )
-            EditModeButton(
-                icon = Icons.Default.FilterList,
-                label = "Filter",
-                isSelected = selectedMode == EditMode.FILTER,
-                onClick = { onModeSelected(EditMode.FILTER) }
-            )
-            EditModeButton(
-                icon = Icons.Default.Tune,
-                label = "Adjust",
-                isSelected = selectedMode == EditMode.ADJUST,
-                onClick = { onModeSelected(EditMode.ADJUST) }
-            )
-            EditModeButton(
-                icon = Icons.Default.EmojiEmotions,
-                label = "Sticker",
-                isSelected = selectedMode == EditMode.STICKER,
-                onClick = { onModeSelected(EditMode.STICKER) }
-            )
-            EditModeButton(
-                icon = Icons.Default.MoreHoriz,
-                label = "More",
-                isSelected = selectedMode == EditMode.MORE,
-                onClick = { onModeSelected(EditMode.MORE) }
+            IconButton(
+                onClick = onRotate,
+                modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
+            ) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Rotate -90", tint = Color.White)
+            }
+            IconButton(
+                onClick = onFlipH,
+                modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
+            ) {
+                Icon(imageVector = Icons.Default.Flip, contentDescription = "Flip H", tint = Color.White)
+            }
+        }
+
+        // MIDDLE: Horizontal scrollbar for fine-tuning rotation
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            RotationSliderWithLines(
+                value = editState.rotation,
+                onValueChange = { newValue ->
+                    val delta = newValue - editState.rotation
+                    onRotateFine(delta)
+                    onEditStateChange(editState.copy(rotation = newValue))
+                }
             )
         }
     }
@@ -557,30 +584,6 @@ fun EditModeButton(
             text = label,
             color = if (isSelected) Color(0xFFFFD700) else Color.White.copy(alpha = 0.6f),
             fontSize = 11.sp
-        )
-    }
-}
-
-@Composable
-fun CropControls(
-    editState: ImageEditState,
-    onEditStateChange: (ImageEditState) -> Unit,
-    onRotate: (Float) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.9f))
-            .padding(16.dp)
-    ) {
-        // Custom rotation slider with vertical lines
-        RotationSliderWithLines(
-            value = editState.rotation,
-            onValueChange = { newValue ->
-                val delta = newValue - editState.rotation
-                onRotate(delta)
-                onEditStateChange(editState.copy(rotation = newValue))
-            }
         )
     }
 }
@@ -681,65 +684,6 @@ fun RotationSliderWithLines(
 }
 
 @Composable
-fun FilterControls(
-    editState: ImageEditState,
-    onEditStateChange: (ImageEditState) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.9f))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Filters",
-            color = Color.White,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FilterPreset("Original", onClick = {
-                onEditStateChange(editState.copy(brightness = 0f, contrast = 1f, saturation = 1f))
-            })
-            FilterPreset("Bright", onClick = {
-                onEditStateChange(editState.copy(brightness = 0.2f, contrast = 1.1f, saturation = 1.2f))
-            })
-            FilterPreset("Dark", onClick = {
-                onEditStateChange(editState.copy(brightness = -0.2f, contrast = 1.2f, saturation = 0.8f))
-            })
-            FilterPreset("B&W", onClick = {
-                onEditStateChange(editState.copy(saturation = 0f, contrast = 1.3f))
-            })
-        }
-    }
-}
-
-@Composable
-fun FilterPreset(label: String, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .background(Color.Gray, RoundedCornerShape(8.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 11.sp
-        )
-    }
-}
-
-@Composable
 fun AdjustControls(
     editState: ImageEditState,
     onEditStateChange: (ImageEditState) -> Unit
@@ -801,6 +745,65 @@ fun AdjustControls(
                 activeTrackColor = Color(0xFFFFD700)
             )
         )
+    }
+}
+
+@Composable
+fun FilterPreset(label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .background(Color.Gray, RoundedCornerShape(8.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+fun FilterControls(
+    editState: ImageEditState,
+    onEditStateChange: (ImageEditState) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Filters",
+            color = Color.White,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FilterPreset("Original", onClick = {
+                onEditStateChange(editState.copy(brightness = 0f, contrast = 1f, saturation = 1f))
+            })
+            FilterPreset("Bright", onClick = {
+                onEditStateChange(editState.copy(brightness = 0.2f, contrast = 1.1f, saturation = 1.2f))
+            })
+            FilterPreset("Dark", onClick = {
+                onEditStateChange(editState.copy(brightness = -0.2f, contrast = 1.2f, saturation = 0.8f))
+            })
+            FilterPreset("B&W", onClick = {
+                onEditStateChange(editState.copy(saturation = 0f, contrast = 1.3f))
+            })
+        }
     }
 }
 
