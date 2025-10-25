@@ -7,6 +7,7 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.net.Uri
 import android.content.Context
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -39,7 +41,6 @@ import java.io.FileOutputStream
 
 // uCrop
 import com.yalantis.ucrop.view.UCropView
-import com.yalantis.ucrop.view.OverlayView
 import com.yalantis.ucrop.callback.BitmapCropCallback
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -148,17 +149,18 @@ fun ImageEditor(
         } catch (t: Throwable) {
             t.printStackTrace()
         }
+        @Suppress("DEPRECATION")
         kotlinx.coroutines.suspendCancellableCoroutine { cont ->
             cropView.cropAndSaveImage(
                 Bitmap.CompressFormat.JPEG,
                 90,
                 object : BitmapCropCallback {
                     override fun onBitmapCropped(resultUri: Uri, offsetX: Int, offsetY: Int, imageWidth: Int, imageHeight: Int) {
-                        cont.resume(resultUri, null)
+                        cont.resume(resultUri) { }
                     }
                     override fun onCropFailure(t: Throwable) {
                         t.printStackTrace()
-                        cont.resume(null, null)
+                        cont.resume(null) { }
                     }
                 }
             )
@@ -208,8 +210,8 @@ fun ImageEditor(
 
                 @Suppress("DEPRECATION")
                 val paint = android.graphics.Paint().apply { colorFilter = ColorMatrixColorFilter(colorMatrix) }
+                val resultBitmap = androidx.core.graphics.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
                 @Suppress("DEPRECATION")
-                val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(resultBitmap)
                 canvas.drawBitmap(bitmap, 0f, 0f, paint)
 
@@ -325,7 +327,7 @@ fun ImageEditor(
             ) {
                 if (currentImageUri != null) {
                     if (editMode == EditMode.CROP) {
-                        AndroidView<UCropView>(
+                        AndroidView(
                             modifier = Modifier.fillMaxSize(),
                             factory = { ctx: Context ->
                                 UCropView(ctx, null).also { view ->
@@ -348,7 +350,26 @@ fun ImageEditor(
             }
 
             // Edit Mode Selector
-            EditModeSelector(selectedMode = editMode, onModeSelected = { editMode = it })
+            EditModeSelector(
+                selectedMode = editMode,
+                onModeSelected = { editMode = it },
+                onRotate = {
+                    uCropViewRef?.cropImageView?.postRotate(-90f)
+                    uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
+                },
+                onFlipH = {
+                    val src = currentImageUri ?: return@EditModeSelector
+                    scope.launch {
+                        val flippedUri = flipCurrentImageHorizontal(src)
+                        flippedUri?.let { uri ->
+                            val updated = croppedImageUris.toMutableMap()
+                            updated[currentImageIndex] = uri
+                            croppedImageUris = updated.toMap()
+                            uCropViewRef?.let { configureUCropView(it, uri) }
+                        }
+                    }
+                }
+            )
 
             // Controls
             when (editMode) {
@@ -358,20 +379,6 @@ fun ImageEditor(
                     onRotate = { degrees ->
                         uCropViewRef?.cropImageView?.postRotate(degrees)
                         uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
-                    },
-                    onFlipH = {
-                        val src = currentImageUri ?: return@CropControls
-                        scope.launch {
-                            isProcessing = true
-                            val flippedUri = flipCurrentImageHorizontal(src)
-                            flippedUri?.let { uri ->
-                                val updated = croppedImageUris.toMutableMap()
-                                updated[currentImageIndex] = uri
-                                croppedImageUris = updated.toMap()
-                                uCropViewRef?.let { configureUCropView(it, uri) }
-                            }
-                            isProcessing = false
-                        }
                     }
                 )
                 EditMode.FILTER -> FilterControls(editState, onEditStateChange = { editState = it })
@@ -452,45 +459,77 @@ fun ImageEditCanvas(
 @Composable
 fun EditModeSelector(
     selectedMode: EditMode,
-    onModeSelected: (EditMode) -> Unit
+    onModeSelected: (EditMode) -> Unit,
+    onRotate: () -> Unit = {},
+    onFlipH: () -> Unit = {}
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Black.copy(alpha = 0.9f))
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        EditModeButton(
-            icon = Icons.Default.CropRotate,
-            label = "Crop",
-            isSelected = selectedMode == EditMode.CROP,
-            onClick = { onModeSelected(EditMode.CROP) }
-        )
-        EditModeButton(
-            icon = Icons.Default.FilterVintage,
-            label = "Filter",
-            isSelected = selectedMode == EditMode.FILTER,
-            onClick = { onModeSelected(EditMode.FILTER) }
-        )
-        EditModeButton(
-            icon = Icons.Default.Tune,
-            label = "Adjust",
-            isSelected = selectedMode == EditMode.ADJUST,
-            onClick = { onModeSelected(EditMode.ADJUST) }
-        )
-        EditModeButton(
-            icon = Icons.Default.EmojiEmotions,
-            label = "Sticker",
-            isSelected = selectedMode == EditMode.STICKER,
-            onClick = { onModeSelected(EditMode.STICKER) }
-        )
-        EditModeButton(
-            icon = Icons.Default.MoreHoriz,
-            label = "More",
-            isSelected = selectedMode == EditMode.MORE,
-            onClick = { onModeSelected(EditMode.MORE) }
-        )
+        // Rotation and Flip buttons (only show in CROP mode)
+        if (selectedMode == EditMode.CROP) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onRotate,
+                    modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
+                ) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Rotate -90", tint = Color.White)
+                }
+                IconButton(
+                    onClick = onFlipH,
+                    modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
+                ) {
+                    Icon(imageVector = Icons.Default.Flip, contentDescription = "Flip H", tint = Color.White)
+                }
+            }
+        }
+
+        // Mode selector buttons
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            EditModeButton(
+                icon = Icons.Default.CropRotate,
+                label = "Crop",
+                isSelected = selectedMode == EditMode.CROP,
+                onClick = { onModeSelected(EditMode.CROP) }
+            )
+            EditModeButton(
+                icon = Icons.Default.FilterList,
+                label = "Filter",
+                isSelected = selectedMode == EditMode.FILTER,
+                onClick = { onModeSelected(EditMode.FILTER) }
+            )
+            EditModeButton(
+                icon = Icons.Default.Tune,
+                label = "Adjust",
+                isSelected = selectedMode == EditMode.ADJUST,
+                onClick = { onModeSelected(EditMode.ADJUST) }
+            )
+            EditModeButton(
+                icon = Icons.Default.EmojiEmotions,
+                label = "Sticker",
+                isSelected = selectedMode == EditMode.STICKER,
+                onClick = { onModeSelected(EditMode.STICKER) }
+            )
+            EditModeButton(
+                icon = Icons.Default.MoreHoriz,
+                label = "More",
+                isSelected = selectedMode == EditMode.MORE,
+                onClick = { onModeSelected(EditMode.MORE) }
+            )
+        }
     }
 }
 
@@ -526,8 +565,7 @@ fun EditModeButton(
 fun CropControls(
     editState: ImageEditState,
     onEditStateChange: (ImageEditState) -> Unit,
-    onRotate: (Float) -> Unit,
-    onFlipH: () -> Unit
+    onRotate: (Float) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -535,43 +573,110 @@ fun CropControls(
             .background(Color.Black.copy(alpha = 0.9f))
             .padding(16.dp)
     ) {
-        Text(
-            text = "Straighten",
-            color = Color.White,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Slider(
+        // Custom rotation slider with vertical lines
+        RotationSliderWithLines(
             value = editState.rotation,
             onValueChange = { newValue ->
                 val delta = newValue - editState.rotation
                 onRotate(delta)
                 onEditStateChange(editState.copy(rotation = newValue))
-            },
-            valueRange = -180f..180f,
-            colors = SliderDefaults.colors(thumbColor = Color(0xFFFFD700), activeTrackColor = Color(0xFFFFD700))
+            }
         )
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
+@Composable
+fun RotationSliderWithLines(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val lineSpacing = 4.dp
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Scrollable lines background
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, _, _ ->
+                        dragOffset += pan.x
+                        // Map drag to rotation value (-180 to 180)
+                        val sensitivity = 0.5f
+                        val newValue = (value - pan.x * sensitivity).coerceIn(-180f, 180f)
+                        onValueChange(newValue)
+                    }
+                }
         ) {
-            IconButton(
-                onClick = { onRotate(-90f) },
-                modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
-            ) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.RotateLeft, contentDescription = "Rotate -90", tint = Color.White)
+            val centerX = size.width / 2f
+            val lineSpacingPx = lineSpacing.toPx()
+
+            // Calculate offset based on rotation value
+            val pixelsPerDegree = lineSpacingPx
+            val scrollOffset = value * pixelsPerDegree
+
+            // Draw vertical lines
+            for (i in -200..200) {
+                val xPos = centerX + (i * lineSpacingPx) - scrollOffset
+
+                if (xPos >= 0 && xPos <= size.width) {
+                    val degree = i
+
+                    // Determine line height based on position
+                    val lineHeight = when {
+                        degree % 45 == 0 -> size.height * 0.7f // Major marks
+                        degree % 15 == 0 -> size.height * 0.5f // Medium marks
+                        degree % 5 == 0 -> size.height * 0.35f // Minor marks
+                        else -> size.height * 0.25f // Smallest marks
+                    }
+
+                    // Determine color - center line is highlighted
+                    val distanceFromCenter = kotlin.math.abs(xPos - centerX)
+                    val alpha = if (distanceFromCenter < 3f) 1f else 0.4f
+                    val color = if (distanceFromCenter < 3f) {
+                        Color(0xFFFFD700) // Gold for center
+                    } else {
+                        Color.White.copy(alpha = alpha)
+                    }
+
+                    val yStart = (size.height - lineHeight) / 2f
+                    val yEnd = yStart + lineHeight
+
+                    drawLine(
+                        color = color,
+                        start = Offset(xPos, yStart),
+                        end = Offset(xPos, yEnd),
+                        strokeWidth = if (distanceFromCenter < 3f) 3f else 1.5f
+                    )
+                }
             }
-            IconButton(
-                onClick = onFlipH,
-                modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.15f), CircleShape)
-            ) {
-                Icon(imageVector = Icons.Default.Flip, contentDescription = "Flip H", tint = Color.White)
-            }
+
+            // Draw center indicator line (fixed position)
+            drawLine(
+                color = Color(0xFFFFD700),
+                start = Offset(centerX, 0f),
+                end = Offset(centerX, size.height),
+                strokeWidth = 3f
+            )
         }
+
+        // Degree value display
+        Text(
+            text = "${value.toInt()}°",
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 4.dp)
+        )
     }
 }
 
