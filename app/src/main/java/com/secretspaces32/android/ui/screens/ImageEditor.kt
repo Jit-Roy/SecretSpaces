@@ -13,7 +13,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +47,11 @@ import java.io.FileOutputStream
 import com.yalantis.ucrop.view.UCropView
 import com.yalantis.ucrop.callback.BitmapCropCallback
 import androidx.compose.ui.viewinterop.AndroidView
+import com.zomato.photofilters.geometry.Point
+
+// AndroidPhotoFilters
+import com.zomato.photofilters.imageprocessors.Filter
+import com.zomato.photofilters.imageprocessors.subfilters.*
 
 enum class EditMode {
     CROP, FILTER, ADJUST, STICKER, MORE
@@ -61,8 +70,137 @@ data class ImageEditState(
     val showGrid: Boolean = true,
     val cropScale: Float = 1f,
     val cropOffsetX: Float = 0f,
-    val cropOffsetY: Float = 0f
+    val cropOffsetY: Float = 0f,
+    val selectedFilter: String = "Original" // Track selected filter
 )
+
+// Load native library for AndroidPhotoFilters
+private var isNativeLibraryLoaded = false
+
+private fun loadNativeLibrary() {
+    if (!isNativeLibraryLoaded) {
+        try {
+            System.loadLibrary("NativeImageProcessor")
+            isNativeLibraryLoaded = true
+        } catch (t: Throwable) { // catch Errors too (e.g., UnsatisfiedLinkError)
+            t.printStackTrace()
+            isNativeLibraryLoaded = false
+        }
+    }
+}
+
+// Decode a smaller bitmap for preview to keep filtering fast
+private fun decodeBitmapForPreview(context: Context, uri: Uri, maxDim: Int = 2048): Bitmap? {
+    return try {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        val (w, h) = opts.outWidth to opts.outHeight
+        if (w <= 0 || h <= 0) return null
+        var sampleSize = 1
+        var tmpW = w
+        var tmpH = h
+        while (tmpW > maxDim || tmpH > maxDim) {
+            tmpW /= 2
+            tmpH /= 2
+            sampleSize *= 2
+        }
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize; inPreferredConfig = Bitmap.Config.ARGB_8888 }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOpts) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+// Ensure we always pass a mutable ARGB_8888 bitmap to the native filters
+private fun ensureMutableArgb(bitmap: Bitmap): Bitmap {
+    if (bitmap.config == Bitmap.Config.ARGB_8888 && bitmap.isMutable) return bitmap
+    return bitmap.copy(Bitmap.Config.ARGB_8888, /* mutable = */ true)
+}
+
+// Apply AndroidPhotoFilters based on filter name
+fun applyPhotoFilter(context: Context, bitmap: Bitmap, filterName: String): Bitmap {
+    // Ensure native library is loaded
+    loadNativeLibrary()
+
+    val filter = when (filterName) {
+        "Original" -> return bitmap
+        "Bright" -> Filter().apply {
+            addSubFilter(BrightnessSubFilter(30))
+            addSubFilter(ContrastSubFilter(1.1f))
+            addSubFilter(SaturationSubFilter(0.2f))
+        }
+        "Dark" -> Filter().apply {
+            addSubFilter(BrightnessSubFilter(-30))
+            addSubFilter(ContrastSubFilter(1.2f))
+            addSubFilter(VignetteSubFilter(context, 100))
+        }
+        "B&W" -> Filter().apply {
+            addSubFilter(SaturationSubFilter(0.0f))
+            addSubFilter(ContrastSubFilter(1.3f))
+        }
+        "Warm" -> Filter().apply {
+            addSubFilter(ColorOverlaySubFilter(200, 1.0f, 0.6f, 0.2f))
+            addSubFilter(BrightnessSubFilter(10))
+        }
+        "Cool" -> Filter().apply {
+            addSubFilter(ColorOverlaySubFilter(150, 0.2f, 0.5f, 1.0f))
+            addSubFilter(ContrastSubFilter(1.1f))
+        }
+        "Vintage" -> Filter().apply {
+            addSubFilter(ColorOverlaySubFilter(100, 1.0f, 0.8f, 0.5f))
+            addSubFilter(ContrastSubFilter(1.2f))
+            addSubFilter(VignetteSubFilter(context, 150))
+        }
+        "Sepia" -> Filter().apply {
+            val red = arrayOf(
+                Point(0f, 10f),
+                Point(100f, 130f),
+                Point(255f, 255f)
+            )
+            val green = arrayOf(
+                Point(0f, 0f),
+                Point(100f, 110f),
+                Point(255f, 240f)
+            )
+            val blue = arrayOf(
+                Point(0f, 0f),
+                Point(100f, 80f),
+                Point(255f, 210f)
+            )
+            addSubFilter(ToneCurveSubFilter(null, red, green, blue))
+        }
+        "Vivid" -> Filter().apply {
+            addSubFilter(ContrastSubFilter(1.3f))
+            addSubFilter(SaturationSubFilter(0.5f))
+            addSubFilter(BrightnessSubFilter(5))
+        }
+        "Nashville" -> Filter().apply {
+            addSubFilter(ColorOverlaySubFilter(100, 1.0f, 0.78f, 0.58f))
+            addSubFilter(ContrastSubFilter(1.2f))
+            addSubFilter(BrightnessSubFilter(5))
+        }
+        "Retro" -> Filter().apply {
+            val rgb = arrayOf(
+                Point(0f, 0f),
+                Point(80f, 70f),
+                Point(180f, 200f),
+                Point(255f, 255f)
+            )
+            addSubFilter(ToneCurveSubFilter(rgb, null, null, null))
+            addSubFilter(VignetteSubFilter(context, 120))
+        }
+        else -> return bitmap
+    }
+
+    return try {
+        val working = ensureMutableArgb(bitmap)
+        filter.processFilter(working)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        bitmap
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,10 +223,31 @@ fun ImageEditor(
     // UCrop view reference for current screen
     var uCropViewRef by remember { mutableStateOf<UCropView?>(null) }
 
+    // Store filtered bitmap for preview
+    var filteredBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
     // Use cropped uri if available for current index
     val currentImageUri: Uri? = run {
         val original = selectedImages.getOrNull(currentImageIndex)
         croppedImageUris[currentImageIndex] ?: original
+    }
+
+    // Apply filter when selected filter changes
+    LaunchedEffect(editState.selectedFilter, currentImageUri) {
+        if (editState.selectedFilter != "Original" && currentImageUri != null) {
+            val out: Bitmap? = withContext(Dispatchers.IO) {
+                try {
+                    val preview = decodeBitmapForPreview(context, currentImageUri)
+                    preview?.let { applyPhotoFilter(context, it, editState.selectedFilter) }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+            }
+            filteredBitmap = out
+        } else {
+            filteredBitmap = null
+        }
     }
 
     // Flip current image by writing a mirrored temporary file and return its Uri
@@ -175,6 +334,9 @@ fun ImageEditor(
                 val inputStream = context.contentResolver.openInputStream(croppedFirstUri!!)
                 var bitmap = BitmapFactory.decodeStream(inputStream)
                 inputStream?.close()
+
+                // Apply AndroidPhotoFilters based on selected filter
+                bitmap = applyPhotoFilter(context, bitmap, editState.selectedFilter)
 
                 // Apply transformations (flip + color); rotation is handled by UCrop
                 val matrix = Matrix().apply {
@@ -343,7 +505,8 @@ fun ImageEditor(
                         ImageEditCanvas(
                             imageUri = currentImageUri,
                             editState = editState,
-                            onEditStateChange = { editState = it }
+                            onEditStateChange = { editState = it },
+                            filteredBitmap = filteredBitmap
                         )
                     }
                 }
@@ -365,14 +528,16 @@ fun ImageEditor(
                             uCropViewRef?.cropImageView?.setImageToWrapCropBounds(true)
                         },
                         onFlipH = {
-                            val src = currentImageUri ?: return@CropControlsSection
-                            scope.launch {
-                                val flippedUri = flipCurrentImageHorizontal(src)
-                                flippedUri?.let { uri ->
-                                    val updated = croppedImageUris.toMutableMap()
-                                    updated[currentImageIndex] = uri
-                                    croppedImageUris = updated.toMap()
-                                    uCropViewRef?.let { configureUCropView(it, uri) }
+                            val src = currentImageUri
+                            if (src != null) {
+                                scope.launch {
+                                    val flippedUri = flipCurrentImageHorizontal(src)
+                                    flippedUri?.let { uri ->
+                                        val updated = croppedImageUris.toMutableMap()
+                                        updated[currentImageIndex] = uri
+                                        croppedImageUris = updated.toMap()
+                                        uCropViewRef?.let { configureUCropView(it, uri) }
+                                    }
                                 }
                             }
                         }
@@ -397,7 +562,8 @@ fun ImageEditor(
 fun ImageEditCanvas(
     imageUri: Uri,
     editState: ImageEditState,
-    onEditStateChange: (ImageEditState) -> Unit
+    onEditStateChange: (ImageEditState) -> Unit,
+    filteredBitmap: Bitmap? = null
 ) {
     var scale by remember { mutableFloatStateOf(editState.scale) }
     var offsetX by remember { mutableFloatStateOf(editState.offsetX) }
@@ -410,7 +576,11 @@ fun ImageEditCanvas(
     ) {
         // Image layer with transform gestures
         Image(
-            painter = rememberAsyncImagePainter(imageUri),
+            painter = if (filteredBitmap != null) {
+                BitmapPainter(filteredBitmap.asImageBitmap())
+            } else {
+                rememberAsyncImagePainter(imageUri)
+            },
             contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
@@ -749,22 +919,33 @@ fun AdjustControls(
 }
 
 @Composable
-fun FilterPreset(label: String, onClick: () -> Unit) {
+fun FilterPreset(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp)
     ) {
         Box(
             modifier = Modifier
                 .size(60.dp)
                 .background(Color.Gray, RoundedCornerShape(8.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                .border(
+                    width = if (isSelected) 3.dp else 1.dp,
+                    color = if (isSelected) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(8.dp)
+                )
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
-            color = Color.White,
-            fontSize = 11.sp
+            color = if (isSelected) Color(0xFFFFD700) else Color.White,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
@@ -787,22 +968,95 @@ fun FilterControls(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
+        // Scrollable horizontal list of filters
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterPreset("Original", onClick = {
-                onEditStateChange(editState.copy(brightness = 0f, contrast = 1f, saturation = 1f))
-            })
-            FilterPreset("Bright", onClick = {
-                onEditStateChange(editState.copy(brightness = 0.2f, contrast = 1.1f, saturation = 1.2f))
-            })
-            FilterPreset("Dark", onClick = {
-                onEditStateChange(editState.copy(brightness = -0.2f, contrast = 1.2f, saturation = 0.8f))
-            })
-            FilterPreset("B&W", onClick = {
-                onEditStateChange(editState.copy(saturation = 0f, contrast = 1.3f))
-            })
+            FilterPreset(
+                label = "Original",
+                isSelected = editState.selectedFilter == "Original",
+                onClick = {
+                    onEditStateChange(editState.copy(
+                        selectedFilter = "Original",
+                        brightness = 0f,
+                        contrast = 1f,
+                        saturation = 1f
+                    ))
+                }
+            )
+            FilterPreset(
+                label = "Bright",
+                isSelected = editState.selectedFilter == "Bright",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Bright"))
+                }
+            )
+            FilterPreset(
+                label = "Dark",
+                isSelected = editState.selectedFilter == "Dark",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Dark"))
+                }
+            )
+            FilterPreset(
+                label = "B&W",
+                isSelected = editState.selectedFilter == "B&W",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "B&W"))
+                }
+            )
+            FilterPreset(
+                label = "Warm",
+                isSelected = editState.selectedFilter == "Warm",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Warm"))
+                }
+            )
+            FilterPreset(
+                label = "Cool",
+                isSelected = editState.selectedFilter == "Cool",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Cool"))
+                }
+            )
+            FilterPreset(
+                label = "Vintage",
+                isSelected = editState.selectedFilter == "Vintage",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Vintage"))
+                }
+            )
+            FilterPreset(
+                label = "Sepia",
+                isSelected = editState.selectedFilter == "Sepia",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Sepia"))
+                }
+            )
+            FilterPreset(
+                label = "Vivid",
+                isSelected = editState.selectedFilter == "Vivid",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Vivid"))
+                }
+            )
+            FilterPreset(
+                label = "Nashville",
+                isSelected = editState.selectedFilter == "Nashville",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Nashville"))
+                }
+            )
+            FilterPreset(
+                label = "Retro",
+                isSelected = editState.selectedFilter == "Retro",
+                onClick = {
+                    onEditStateChange(editState.copy(selectedFilter = "Retro"))
+                }
+            )
         }
     }
 }

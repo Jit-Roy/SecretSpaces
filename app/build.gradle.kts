@@ -86,6 +86,13 @@ android {
     }
 }
 
+// Globally exclude legacy support libraries to avoid conflicts with AndroidX
+configurations.all {
+    exclude(group = "com.android.support", module = "support-v4")
+    exclude(group = "com.android.support", module = "support-annotations")
+    exclude(group = "com.android.support")
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -126,11 +133,25 @@ dependencies {
     implementation(libs.coil.compose)
 
     // uCrop for image cropping
-    implementation("com.github.yalantis:ucrop:2.2.8")
+    implementation("com.github.yalantis:ucrop:2.2.8") {
+        // Exclude any legacy support libraries if brought transitively
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.android.support", module = "support-annotations")
+    }
+
+    // AndroidPhotoFilters for image filters
+    implementation("com.github.Zomato:AndroidPhotoFilters:1.0.2") {
+        // Exclude legacy support to avoid conflicts with AndroidX
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.android.support", module = "support-annotations")
+    }
 
     // MapLibre for maps (using MapTiler)
     implementation("org.maplibre.gl:android-sdk:11.5.2")
-    implementation("org.maplibre.gl:android-plugin-annotation-v9:3.0.2")
+    implementation("org.maplibre.gl:android-plugin-annotation-v9:3.0.2") {
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.android.support", module = "support-annotations")
+    }
     implementation(libs.play.services.location)
 
     // Coroutines for Play Services (needed for .await())
