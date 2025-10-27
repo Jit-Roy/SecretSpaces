@@ -194,7 +194,8 @@ fun applyPhotoFilter(context: Context, bitmap: Bitmap, filterName: String): Bitm
     }
 
     return try {
-        val working = ensureMutableArgb(bitmap)
+        // Always work on a copy to avoid mutating the input bitmap
+        val working = bitmap.copy(Bitmap.Config.ARGB_8888, /* mutable = */ true)
         filter.processFilter(working)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -226,10 +227,20 @@ fun ImageEditor(
     // Store filtered bitmap for preview
     var filteredBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
+    // Small base preview for filter thumbnails
+    var filterStripBaseBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
     // Use cropped uri if available for current index
     val currentImageUri: Uri? = run {
         val original = selectedImages.getOrNull(currentImageIndex)
         croppedImageUris[currentImageIndex] ?: original
+    }
+
+    // Decode a small preview for the filter strip when image changes
+    LaunchedEffect(currentImageUri) {
+        filterStripBaseBitmap = withContext(Dispatchers.IO) {
+            currentImageUri?.let { decodeBitmapForPreview(context, it, maxDim = 320) }
+        }
     }
 
     // Apply filter when selected filter changes
@@ -543,7 +554,7 @@ fun ImageEditor(
                         }
                     )
                 }
-                EditMode.FILTER -> FilterControls(editState, onEditStateChange = { editState = it })
+                EditMode.FILTER -> FilterControls(baseBitmap = filterStripBaseBitmap, editState = editState, onEditStateChange = { editState = it })
                 EditMode.ADJUST -> AdjustControls(editState, onEditStateChange = { editState = it })
                 EditMode.STICKER -> StickerControls()
                 EditMode.MORE -> MoreControls()
@@ -922,7 +933,9 @@ fun AdjustControls(
 fun FilterPreset(
     label: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    thumbnail: Bitmap? = null,
+    isLoading: Boolean = false
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -938,8 +951,26 @@ fun FilterPreset(
                     width = if (isSelected) 3.dp else 1.dp,
                     color = if (isSelected) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f),
                     shape = RoundedCornerShape(8.dp)
-                )
-        )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                }
+                thumbnail != null -> {
+                    Image(
+                        painter = BitmapPainter(thumbnail.asImageBitmap()),
+                        contentDescription = label,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                else -> {
+                    // empty base, keeps layout stable
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
@@ -952,6 +983,7 @@ fun FilterPreset(
 
 @Composable
 fun FilterControls(
+    baseBitmap: Bitmap?,
     editState: ImageEditState,
     onEditStateChange: (ImageEditState) -> Unit
 ) {
@@ -975,87 +1007,123 @@ fun FilterControls(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Original
+            val origThumb = baseBitmap
             FilterPreset(
                 label = "Original",
                 isSelected = editState.selectedFilter == "Original",
                 onClick = {
-                    onEditStateChange(editState.copy(
-                        selectedFilter = "Original",
-                        brightness = 0f,
-                        contrast = 1f,
-                        saturation = 1f
-                    ))
-                }
+                    onEditStateChange(
+                        editState.copy(
+                            selectedFilter = "Original",
+                            brightness = 0f,
+                            contrast = 1f,
+                            saturation = 1f
+                        )
+                    )
+                },
+                thumbnail = origThumb,
+                isLoading = baseBitmap == null
             )
+
+            // Bright
+            val brightThumb by rememberFilterThumbnail(baseBitmap, "Bright")
             FilterPreset(
                 label = "Bright",
                 isSelected = editState.selectedFilter == "Bright",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Bright"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Bright")) },
+                thumbnail = brightThumb,
+                isLoading = baseBitmap == null || (brightThumb == null)
             )
+
+            // Dark
+            val darkThumb by rememberFilterThumbnail(baseBitmap, "Dark")
             FilterPreset(
                 label = "Dark",
                 isSelected = editState.selectedFilter == "Dark",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Dark"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Dark")) },
+                thumbnail = darkThumb,
+                isLoading = baseBitmap == null || (darkThumb == null)
             )
+
+            // B&W
+            val bwThumb by rememberFilterThumbnail(baseBitmap, "B&W")
             FilterPreset(
                 label = "B&W",
                 isSelected = editState.selectedFilter == "B&W",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "B&W"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "B&W")) },
+                thumbnail = bwThumb,
+                isLoading = baseBitmap == null || (bwThumb == null)
             )
+
+            // Warm
+            val warmThumb by rememberFilterThumbnail(baseBitmap, "Warm")
             FilterPreset(
                 label = "Warm",
                 isSelected = editState.selectedFilter == "Warm",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Warm"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Warm")) },
+                thumbnail = warmThumb,
+                isLoading = baseBitmap == null || (warmThumb == null)
             )
+
+            // Cool
+            val coolThumb by rememberFilterThumbnail(baseBitmap, "Cool")
             FilterPreset(
                 label = "Cool",
                 isSelected = editState.selectedFilter == "Cool",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Cool"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Cool")) },
+                thumbnail = coolThumb,
+                isLoading = baseBitmap == null || (coolThumb == null)
             )
+
+            // Vintage
+            val vintageThumb by rememberFilterThumbnail(baseBitmap, "Vintage")
             FilterPreset(
                 label = "Vintage",
                 isSelected = editState.selectedFilter == "Vintage",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Vintage"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Vintage")) },
+                thumbnail = vintageThumb,
+                isLoading = baseBitmap == null || (vintageThumb == null)
             )
+
+            // Sepia
+            val sepiaThumb by rememberFilterThumbnail(baseBitmap, "Sepia")
             FilterPreset(
                 label = "Sepia",
                 isSelected = editState.selectedFilter == "Sepia",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Sepia"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Sepia")) },
+                thumbnail = sepiaThumb,
+                isLoading = baseBitmap == null || (sepiaThumb == null)
             )
+
+            // Vivid
+            val vividThumb by rememberFilterThumbnail(baseBitmap, "Vivid")
             FilterPreset(
                 label = "Vivid",
                 isSelected = editState.selectedFilter == "Vivid",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Vivid"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Vivid")) },
+                thumbnail = vividThumb,
+                isLoading = baseBitmap == null || (vividThumb == null)
             )
+
+            // Nashville
+            val nashThumb by rememberFilterThumbnail(baseBitmap, "Nashville")
             FilterPreset(
                 label = "Nashville",
                 isSelected = editState.selectedFilter == "Nashville",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Nashville"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Nashville")) },
+                thumbnail = nashThumb,
+                isLoading = baseBitmap == null || (nashThumb == null)
             )
+
+            // Retro
+            val retroThumb by rememberFilterThumbnail(baseBitmap, "Retro")
             FilterPreset(
                 label = "Retro",
                 isSelected = editState.selectedFilter == "Retro",
-                onClick = {
-                    onEditStateChange(editState.copy(selectedFilter = "Retro"))
-                }
+                onClick = { onEditStateChange(editState.copy(selectedFilter = "Retro")) },
+                thumbnail = retroThumb,
+                isLoading = baseBitmap == null || (retroThumb == null)
             )
         }
     }
@@ -1093,4 +1161,26 @@ fun MoreControls() {
             fontSize = 14.sp
         )
     }
+}
+
+@Composable
+private fun rememberFilterThumbnail(base: Bitmap?, filterName: String): State<Bitmap?> {
+    val context = LocalContext.current
+    val thumbState = remember(base, filterName) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(base, filterName) {
+        if (base == null) {
+            thumbState.value = null
+        } else {
+            val bmp = withContext(Dispatchers.IO) {
+                try {
+                    if (filterName == "Original") base else applyPhotoFilter(context, base, filterName)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+            }
+            thumbState.value = bmp
+        }
+    }
+    return thumbState
 }
