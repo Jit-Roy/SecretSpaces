@@ -53,7 +53,10 @@ class MainViewModel(
     private val storyRepository = StoryRepository(context)
     private val locationHelper = LocationHelper(context)
 
-    private val _uiState = MutableStateFlow(AppUiState())
+    // Initialize with current auth state to prevent login screen flash
+    private val _uiState = MutableStateFlow(
+        AppUiState(isAuthenticated = authRepository.isUserSignedIn())
+    )
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
     init {
